@@ -1,51 +1,63 @@
 import 'package:flutter/material.dart';
+import 'category_products_screen.dart'; // <-- 1. THÊM IMPORT: Nhớ chỉnh lại đường dẫn (path) cho đúng vị trí file trong project của bạn
 
 class CategorySection extends StatelessWidget {
   const CategorySection({super.key});
 
-  // Đồng bộ toàn bộ danh sách sử dụng khóa "iconUrl" với các link ảnh mạng trực tiếp chất lượng cao
+  // 🌟 ĐÃ CẬP NHẬT: Đồng bộ thêm khóa "id" cho từng danh mục để hệ thống tự động nhận diện logo thương hiệu khi sang trang mới
   final List<Map<String, dynamic>> categories = const [
     {
+      "id": "dien_thoai",
       "iconUrl": "https://cdn-icons-png.flaticon.com/128/186/186239.png",
       "title": "Điện thoại",
     },
     {
+      "id": "laptop",
       "iconUrl": "https://cdn-icons-png.flaticon.com/512/428/428001.png",
       "title": "Laptop",
     },
     {
+      "id": "dong_ho",
       "iconUrl": "https://cdn-icons-png.flaticon.com/128/9413/9413719.png",
       "title": "Đồng hồ",
     },
     {
+      "id": "tai_nghe", // 🎧 Đã sửa thành tai_nghe đồng bộ với Firebase của bạn
       "iconUrl": "https://cdn-icons-png.flaticon.com/128/6191/6191093.png",
       "title": "Tai nghe",
     },
     {
+      "id": "thoi_trang_nam",
       "iconUrl": "https://cdn-icons-png.flaticon.com/128/4715/4715310.png",
       "title": "Thời trang nam",
     },
     {
+      "id": "thoi_trang_nu",
       "iconUrl": "https://cdn-icons-png.flaticon.com/128/3534/3534312.png",
       "title": "Thời trang nữ",
     },
     {
+      "id": "giay_dep_nam",
       "iconUrl": "https://cdn-icons-png.flaticon.com/128/15619/15619938.png",
       "title": "Giày dép nam",
     },
     {
+      "id": "giay_dep_nu",
       "iconUrl": "https://cdn-icons-png.flaticon.com/128/17023/17023709.png",
       "title": "Giày dép nữ",
     },
     {
+      "id": "nha_bep",
       "iconUrl": "https://cdn-icons-png.flaticon.com/128/1566/1566914.png",
       "title": "Nhà bếp",
     },
     {
+      "id": "tv",
       "iconUrl": "https://cdn-icons-png.flaticon.com/128/3800/3800088.png",
       "title": "TV",
     },
     {
+      "id": "khac",
       "iconUrl": "https://cdn-icons-png.flaticon.com/128/11825/11825276.png",
       "title": "Khác",
     },
@@ -80,12 +92,23 @@ class CategorySection extends StatelessWidget {
             itemBuilder: (context, index) {
               final item = categories[index];
 
-             return Padding(
+              return Padding(
                 padding: const EdgeInsets.only(right: 20),
                 child: GestureDetector(
-                  onTap: () {},
+                  // 2. ĐÃ SỬA ONDOWNCLICK: Tự động gửi cả title và id sang màn hình CategoryProductsScreen
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CategoryProductsScreen(
+                          categoryName: item["title"] ?? "Danh mục", // Truyền chuỗi chữ "Điện thoại", "Đồng hồ"...
+                          categoryId: item["id"] ?? "",              // 🌟 TRUYỀN TỰ ĐỘNG: Gửi id danh mục sang màn hình mới
+                        ),
+                      ),
+                    );
+                  },
                   child: SizedBox(
-                    width: 75, // 2. CỐ ĐỊNH CHIỀU RỘNG MỖI Ô ĐỂ KHOẢNG CÁCH ĐỀU TĂM TẮP
+                    width: 75, // CỐ ĐỊNH CHIỀU RỘNG MỖI Ô ĐỂ KHOẢNG CÁCH ĐỀU TĂM TẮP
                     child: Column(
                       children: [
                         Container(
@@ -127,10 +150,10 @@ class CategorySection extends StatelessWidget {
                           ),
                         ),
                       
-                      const SizedBox(height: 8),
-                      
-                      // Chữ hiển thị tên danh mục
-                     Text(
+                        const SizedBox(height: 8),
+                        
+                        // Chữ hiển thị tên danh mục
+                        Text(
                           item["title"],
                           textAlign: TextAlign.center, // Chữ luôn ở giữa ô
                           maxLines: 2, // Tối đa 2 dòng

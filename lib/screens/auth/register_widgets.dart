@@ -59,19 +59,43 @@ class RegisterForm extends StatefulWidget {
   const RegisterForm({super.key});
 
   @override
-  State<RegisterForm> createState() => _RegisterFormState();
+  State<RegisterForm> createState() => RegisterFormState(); // 🆕 Đổi từ _RegisterFormState thành RegisterFormState (Public)
 }
 
-class _RegisterFormState extends State<RegisterForm> {
+class RegisterFormState extends State<RegisterForm> { // 🆕 Xóa dấu gạch dưới để bên ngoài truy cập được
   bool _hidePassword = true;
   bool _hideConfirmPassword = true;
+
+  // 🆕 Khởi tạo các bộ điều khiển để hứng dữ liệu nhập từ bàn phím
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
+  // 🆕 Tạo các hàm Getter để file RegisterScreen có thể lấy dữ liệu sạch (.trim() để bỏ khoảng trắng thừa)
+  String get nameText => _nameController.text.trim();
+  String get emailText => _emailController.text.trim();
+  String get phoneText => _phoneController.text.trim();
+  String get passwordText => _passwordController.text.trim();
+
+  @override
+  void dispose() {
+    // Giải phóng bộ nhớ khi không dùng nữa
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-
         CustomTextField(
+          controller: _nameController, // 🆕 Gán controller
           hintText: 'Họ và tên',
           prefixIcon: Icons.person_outline,
         ),
@@ -79,6 +103,7 @@ class _RegisterFormState extends State<RegisterForm> {
         const SizedBox(height: 18),
 
         CustomTextField(
+          controller: _emailController, // 🆕 Gán controller
           hintText: 'Email',
           prefixIcon: Icons.email_outlined,
           keyboardType: TextInputType.emailAddress,
@@ -87,6 +112,7 @@ class _RegisterFormState extends State<RegisterForm> {
         const SizedBox(height: 18),
 
         CustomTextField(
+          controller: _phoneController, // 🆕 Gán controller
           hintText: 'Số điện thoại',
           prefixIcon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
@@ -95,6 +121,7 @@ class _RegisterFormState extends State<RegisterForm> {
         const SizedBox(height: 18),
 
         CustomTextField(
+          controller: _passwordController, // 🆕 Gán controller
           hintText: 'Mật khẩu',
           prefixIcon: Icons.lock_outline,
           obscureText: _hidePassword,
@@ -115,6 +142,7 @@ class _RegisterFormState extends State<RegisterForm> {
         const SizedBox(height: 18),
 
         CustomTextField(
+          controller: _confirmPasswordController, // 🆕 Gán controller
           hintText: 'Xác nhận mật khẩu',
           prefixIcon: Icons.lock_outline,
           obscureText: _hideConfirmPassword,
@@ -140,21 +168,18 @@ class _RegisterFormState extends State<RegisterForm> {
 /// REGISTER BUTTON
 /// ===============================
 class RegisterButton extends StatelessWidget {
-  const RegisterButton({super.key});
+  final VoidCallback onPressed; // 🆕 Khai báo callback nhận sự kiện bấm từ file RegisterScreen
+
+  const RegisterButton({
+    super.key,
+    required this.onPressed, // 🆕 Bắt buộc truyền hàm xử lý vào đây
+  });
 
   @override
   Widget build(BuildContext context) {
     return CustomButton(
       text: 'Đăng ký',
-      onPressed: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Đăng ký thành công (Mock)!'),
-          ),
-        );
-
-        Navigator.pop(context);
-      },
+      onPressed: onPressed, // 🆕 Chạy hàm được truyền từ RegisterScreen
     );
   }
 }

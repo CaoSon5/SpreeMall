@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+// import 'package:firebase_auth/firebase_auth.dart'; // Mở ra nếu bạn dùng Firebase Auth
 import '../../config/theme/app_colors.dart';
 import '../../config/theme/app_text_styles.dart';
 import '../../controllers/favorites_controller.dart';
@@ -56,6 +56,20 @@ class _ProfileHeader extends StatelessWidget {
             animation: UserProfileController.instance,
             builder: (context, _) {
               final profile = UserProfileController.instance;
+              
+              // Xử lý hiển thị chữ cái đầu của tên (Nếu rỗng thì hiển thị kí tự mặc định)
+              final String displayLetter = profile.name.trim().isNotEmpty
+                  ? profile.name.trim()[0].toUpperCase()
+                  : '?';
+                  
+              final String displayName = profile.name.isNotEmpty 
+                  ? profile.name 
+                  : 'Người dùng SpreeMall';
+                  
+              final String displayEmail = profile.email.isNotEmpty 
+                  ? profile.email 
+                  : 'chưa cập nhật email';
+
               return Column(
                 children: [
                   Row(
@@ -66,9 +80,7 @@ class _ProfileHeader extends StatelessWidget {
                             radius: 38,
                             backgroundColor: Colors.white,
                             child: Text(
-                              profile.name.isNotEmpty
-                                  ? profile.name.trim()[0].toUpperCase()
-                                  : '?',
+                              displayLetter,
                               style: AppTextStyles.heading1.copyWith(
                                 color: AppColors.primary,
                                 fontSize: 30,
@@ -96,14 +108,14 @@ class _ProfileHeader extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              profile.name,
+                              displayName,
                               style: AppTextStyles.heading1.copyWith(color: Colors.white),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              profile.email,
+                              displayEmail,
                               style: AppTextStyles.bodyRegular.copyWith(color: Colors.white70),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -141,8 +153,8 @@ class _ProfileHeader extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        _StatItem(label: 'Đơn hàng', value: '4'),
-                        _StatDivider(),
+                        const _StatItem(label: 'Đơn hàng', value: '4'),
+                        const _StatDivider(),
                         AnimatedBuilder(
                           animation: FavoritesController.instance,
                           builder: (context, _) => _StatItem(
@@ -150,7 +162,7 @@ class _ProfileHeader extends StatelessWidget {
                             value: '${FavoritesController.instance.count}',
                           ),
                         ),
-                        _StatDivider(),
+                        const _StatDivider(),
                         const _StatItem(label: 'Voucher', value: '2'),
                       ],
                     ),
@@ -363,6 +375,7 @@ class _MenuDivider extends StatelessWidget {
   }
 }
 
+/// Nút đăng xuất đã xử lý dọn dẹp data cũ tránh lưu bộ nhớ đệm
 class _LogoutButton extends StatelessWidget {
   const _LogoutButton();
 
@@ -384,11 +397,20 @@ class _LogoutButton extends StatelessWidget {
                   child: const Text('Huỷ'),
                 ),
                 TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pushNamedAndRemoveUntil(
-                      AppRoutes.login,
-                      (route) => false,
-                    );
+                  onPressed: () async {
+                    // 1. Giải phóng tài khoản trên Firebase Auth (nếu dùng)
+                    // await FirebaseAuth.instance.signOut();
+                    
+                    // 2. Clear sạch dữ liệu trên giao diện thông qua controller
+                    UserProfileController.instance.clearProfile();
+
+                    // 3. Điều hướng về màn Login và xoá toàn bộ stack màn hình cũ
+                    if (context.mounted) {
+                      Navigator.of(context).pushNamedAndRemoveUntil(
+                        AppRoutes.login,
+                        (route) => false,
+                      );
+                    }
                   },
                   child: const Text('Đăng xuất', style: TextStyle(color: AppColors.error)),
                 ),

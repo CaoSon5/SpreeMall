@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart'; // 🆕 Thêm GetX vào đây
 
 import '../../config/theme/app_colors.dart';
 import '../../config/theme/app_text_styles.dart';
 import '../../controllers/cart_controller.dart';
 import '../../controllers/favorites_controller.dart';
+import '../../routes/app_routes.dart'; // 🆕 Nhớ import file app_routes của bạn vào đây nhé
 import '../../utils/formatters.dart';
 import '../product/product_detail_screen.dart';
 import 'product_grid_section.dart';
@@ -299,7 +301,10 @@ class CartTab extends StatelessWidget {
                   ElevatedButton(
                     onPressed: cart.selectedCount == 0
                         ? null
-                        : () => _showCheckoutDialog(context, cart),
+                        : () {
+                            // 🆕 Gọi hàm xử lý logic chuyển màn hình Checkout bằng GetX ở đây
+                            _navigateToCheckout(cart);
+                          },
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
                       shape: RoundedRectangleBorder(
@@ -317,36 +322,18 @@ class CartTab extends StatelessWidget {
     );
   }
 
-  void _showCheckoutDialog(BuildContext context, CartController cart) {
-    final total = cart.selectedTotalPrice;
-    final count = cart.selectedCount;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: const [
-            Icon(Icons.check_circle, color: AppColors.success),
-            SizedBox(width: 8),
-            Text('Đặt hàng thành công'),
-          ],
-        ),
-        content: Text(
-          'Đã đặt $count sản phẩm với tổng tiền ${formatVnd(total)}. '
-          'Đây là mô phỏng giao diện, chưa kết nối hệ thống thanh toán thật.',
-          style: AppTextStyles.bodyRegular,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              cart.checkoutSelected();
-              Navigator.of(context).pop();
-            },
-            child: const Text('Đóng'),
-          ),
-        ],
-      ),
+  // 🆕 Thay thế Dialog mô phỏng cũ bằng hàm chuyển hướng GetX thực tế
+  void _navigateToCheckout(CartController cart) {
+    // Nếu bạn muốn truyền data (như tổng tiền, số lượng sản phẩm) sang trang Thanh toán để dùng:
+    Get.toNamed(
+      AppRoutes.checkout,
+      arguments: {
+        'totalPrice': cart.selectedTotalPrice,
+        'selectedCount': cart.selectedCount,
+      },
     );
+
+    // Lưu ý: Nếu trong Logic của bạn cần thực hiện xóa giỏ hàng hoặc đưa sản phẩm vào trạng thái chờ xử lý mua ngay lập tức, 
+    // bạn có thể chạy thêm hàm: cart.checkoutSelected(); tùy thuộc vào logic backend của bạn nhé.
   }
 }

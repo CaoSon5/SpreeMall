@@ -2,17 +2,20 @@ import 'package:flutter/foundation.dart';
 
 /// Thông tin hồ sơ người dùng (in-memory, không kết nối Firebase/Database).
 /// Dùng để màn hình "Chỉnh sửa hồ sơ" cập nhật và các màn khác đọc lại.
+import 'package:flutter/foundation.dart';
+
 class UserProfileController extends ChangeNotifier {
   UserProfileController._internal();
-  static final UserProfileController instance =
-      UserProfileController._internal();
+  static final UserProfileController instance = UserProfileController._internal();
 
-  String name = 'Nguyễn Văn A';
-  String email = 'guest@spereemall.vn';
-  String phone = '0901 234 567';
-  String gender = 'Nam';
-  String birthday = '01/01/2000';
+  // Mặc định để rỗng để khi chưa đăng nhập hoặc đang tải sẽ không bị lộ thông tin cũ
+  String name = '';
+  String email = '';
+  String phone = '';
+  String gender = '';
+  String birthday = '';
 
+  // Hàm cập nhật từ giao diện (khi sửa hồ sơ) hoặc khi vừa đăng nhập xong
   void update({
     String? name,
     String? email,
@@ -27,4 +30,15 @@ class UserProfileController extends ChangeNotifier {
     if (birthday != null) this.birthday = birthday;
     notifyListeners();
   }
+
+  // Hàm xóa sạch dữ liệu khi Đăng xuất
+  void clearProfile() {
+    name = '';
+    email = '';
+    phone = '';
+    gender = '';
+    birthday = '';
+    notifyListeners();
+  }
+
 }

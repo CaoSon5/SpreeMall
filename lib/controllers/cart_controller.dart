@@ -1,27 +1,27 @@
-import 'package:flutter/foundation.dart';
-
+import 'package:get/get.dart'; // 🆕 Thêm GetX thay vì foundation.dart
 import '../models/product.dart';
 
 /// Một dòng sản phẩm trong giỏ hàng.
 class CartItem {
   final Product product;
-  int quantity;
-  bool selected;
+  int quantity;            
+  bool selected; // 🆕 Sửa lại lỗi khai báo thiếu ở đoạn code cũ của bạn
 
   CartItem({
     required this.product,
-    this.quantity = 1,
+    required this.quantity,
     this.selected = true,
   });
 
   int get totalPrice => product.price * quantity;
 }
 
-/// Quản lý giỏ hàng toàn app (in-memory, không lưu database/Firebase).
-/// Dùng singleton + ChangeNotifier để mọi màn hình cùng lắng nghe thay đổi.
-class CartController extends ChangeNotifier {
-  CartController._internal();
-  static final CartController instance = CartController._internal();
+
+/// Quản lý giỏ hàng toàn app sử dụng GetxController
+class CartController extends GetxController { 
+  // 🆕 Cách lấy instance chuẩn GetX. Khi các màn hình khác gọi `CartController.instance`,
+  // GetX sẽ tự động tìm kiếm controller đã được nạp trong bộ nhớ.
+  static CartController get instance => Get.find<CartController>();
 
   final List<CartItem> _items = [];
 
@@ -51,51 +51,76 @@ class CartController extends ChangeNotifier {
     } else {
       _items.add(CartItem(product: product, quantity: quantity));
     }
-    notifyListeners();
+    update(); // 🆕 Thay thế notifyListeners() bằng update() của GetX
+  }
+  /// 🆕 Xử lý tính năng "Mua ngay" từ trang chi tiết sản phẩm
+  void buyNow(Product product, {int quantity = 1}) {
+    // 1. Tự động bỏ chọn tất cả các sản phẩm đang có sẵn trong giỏ
+    for (final item in _items) {
+      item.selected = false;
+    }
+
+    // 2. Tìm xem sản phẩm bấm mua ngay đã tồn tại trong giỏ chưa
+    final index = _items.indexWhere((i) => i.product.id == product.id);
+    if (index >= 0) {
+      // Nếu đã có sẵn, cộng dồn số lượng và bắt buộc tích chọn nó
+      _items[index].quantity += quantity;
+      _items[index].selected = true;
+    } else {
+      // Nếu chưa có, thêm mới hoàn toàn vào giỏ với trạng thái selected = true
+      _items.add(CartItem(product: product, quantity: quantity, selected: true));
+    }
+    update();
   }
 
   void removeItem(String productId) {
     _items.removeWhere((i) => i.product.id == productId);
-    notifyListeners();
+    update(); // 🆕 Cập nhật giao diện
   }
 
   void increaseQuantity(String productId) {
-    final item = _items.firstWhere((i) => i.product.id == productId);
-    item.quantity++;
-    notifyListeners();
+    final index = _items.indexWhere((i) => i.product.id == productId);
+    if (index >= 0) {
+      _items[index].quantity++;
+      update();
+    }
   }
 
   void decreaseQuantity(String productId) {
-    final item = _items.firstWhere((i) => i.product.id == productId);
-    if (item.quantity <= 1) {
-      removeItem(productId);
-    } else {
-      item.quantity--;
-      notifyListeners();
+    final index = _items.indexWhere((i) => i.product.id == productId);
+    if (index >= 0) {
+      if (_items[index].quantity <= 1) {
+        _items.removeAt(index);
+      } else {
+        _items[index].quantity--;
+      }
+      update();
     }
   }
 
   void toggleSelected(String productId) {
-    final item = _items.firstWhere((i) => i.product.id == productId);
-    item.selected = !item.selected;
-    notifyListeners();
+    final index = _items.indexWhere((i) => i.product.id == productId);
+    if (index >= 0) {
+      _items[index].selected = !_items[index].selected;
+      update();
+    }
   }
 
   void toggleSelectAll(bool value) {
     for (final item in _items) {
       item.selected = value;
     }
-    notifyListeners();
+    update();
   }
 
   /// Xoá các sản phẩm đã chọn khỏi giỏ (dùng sau khi "đặt hàng" thành công).
   void checkoutSelected() {
     _items.removeWhere((i) => i.selected);
-    notifyListeners();
+    update();
   }
 
   void clear() {
     _items.clear();
-    notifyListeners();
+    update();
   }
 }

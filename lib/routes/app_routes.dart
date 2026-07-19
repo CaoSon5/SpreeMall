@@ -1,68 +1,52 @@
+import 'package:get/get.dart';
 import 'package:flutter/material.dart';
-
 import '../screens/auth/forgot_password_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/splash/splash_screen.dart';
+import '../screens/checkout/checkout_screen.dart'; // File checkout bạn đã import sẵn
 
 class AppRoutes {
   AppRoutes._();
 
   // ===============================
-  // Route Name
+  // Tên Route (Đường dẫn trang)
   // ===============================
-
   static const String splash = "/";
   static const String login = "/login";
   static const String register = "/register";
   static const String forgotPassword = "/forgot-password";
   static const String home = "/home";
+  static const String checkout = "/checkout"; // 🆕 Định nghĩa đường dẫn cho trang thanh toán
 
   // ===============================
-  // Generate Route
+  // Danh sách trang quản lý bằng GetX
   // ===============================
-
-  static Route<dynamic> generateRoute(RouteSettings settings) {
-    switch (settings.name) {
-      case splash:
-        return MaterialPageRoute(
-          builder: (_) => const SplashScreen(),
-        );
-
-      case login:
-        return MaterialPageRoute(
-          builder: (_) => const LoginScreen(),
-        );
-
-      case register:
-        return MaterialPageRoute(
-          builder: (_) => const RegisterScreen(),
-        );
-
-      case forgotPassword:
-        return MaterialPageRoute(
-          builder: (_) => const ForgotPasswordScreen(),
-        );
-
-      case home:
-        return MaterialPageRoute(
-          builder: (_) => const HomeScreen(),
-        );
-
-      default:
-        return MaterialPageRoute(
-          builder: (_) => Scaffold(
-            appBar: AppBar(
-              title: const Text('404'),
-            ),
-            body: Center(
-              child: Text(
-                'Không tìm thấy route: ${settings.name}',
-              ),
-            ),
-          ),
-        );
-    }
-  }
+  static final List<GetPage> routes = [
+    GetPage(
+      name: splash,
+      page: () => const SplashScreen(),
+    ),
+    GetPage(
+      name: login,
+      page: () => const LoginScreen(),
+    ),
+    GetPage(
+      name: register,
+      page: () => const RegisterScreen(),
+    ),
+    GetPage(
+      name: forgotPassword,
+      page: () => const ForgotPasswordScreen(),
+    ),
+    GetPage(
+      name: home,
+      page: () => const HomeScreen(),
+    ),
+    GetPage(
+      name: checkout,
+      page: () => const CheckoutScreen(), // 🆕 Khai báo trang thanh toán vào hệ thống GetX
+    ),
+  ];
 }
