@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-// import 'package:firebase_auth/firebase_auth.dart'; // Mở ra nếu bạn dùng Firebase Auth
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../config/theme/app_colors.dart';
 import '../../config/theme/app_text_styles.dart';
 import '../../controllers/favorites_controller.dart';
