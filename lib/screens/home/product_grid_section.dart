@@ -1,19 +1,25 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../config/theme/app_colors.dart';
 import '../../config/theme/app_text_styles.dart';
 import '../../controllers/cart_controller.dart';
-import '../../controllers/favorites_controller.dart';
-import '../../data/mock_products.dart';
 import '../../models/product.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/custom_section_title.dart';
 import '../product/product_detail_screen.dart';
 
-class ProductGridSection extends StatelessWidget {
+class ProductGridSection extends StatefulWidget {
   const ProductGridSection({super.key});
 
-  static final List<Product> _products = MockProducts.featured;
+  @override
+  State<ProductGridSection> createState() => _ProductGridSectionState();
+}
+
+class _ProductGridSectionState extends State<ProductGridSection> {
+
+  final int _seed = DateTime.now().millisecondsSinceEpoch;
 
   @override
   Widget build(BuildContext context) {
@@ -23,18 +29,42 @@ class ProductGridSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const CustomSectionTitle(title: "Sản phẩm nổi bật"),
-          GridView.builder(
-            itemCount: _products.length,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 0.7,
-            ),
-            itemBuilder: (context, index) {
-              return ProductCard(product: _products[index]);
+
+          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: FirebaseFirestore.instance.collection('products').snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              final docs = snapshot.data?.docs ?? [];
+              final products = docs.map((d) => Product.fromMap(d.id, d.data())).toList()
+                ..shuffle(Random(_seed));
+
+              if (products.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: Text('Chưa có sản phẩm nào')),
+                );
+              }
+
+              return GridView.builder(
+                itemCount: products.length,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 0.7,
+                ),
+                itemBuilder: (context, index) {
+                  return ProductCard(product: products[index]);
+                },
+              );
             },
           ),
         ],
@@ -43,7 +73,6 @@ class ProductGridSection extends StatelessWidget {
   }
 }
 
-/// Card sản phẩm dùng chung (Trang chủ, có thể tái sử dụng ở Yêu thích).
 class ProductCard extends StatelessWidget {
   final Product product;
 
@@ -76,6 +105,14 @@ class ProductCard extends StatelessWidget {
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.border),
+
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -95,10 +132,17 @@ class ProductCard extends StatelessWidget {
                       child: product.image.isNotEmpty
                           ? Padding(
                               padding: const EdgeInsets.all(12),
-                              child: Image.asset(
-                                product.image,
-                                fit: BoxFit.contain,
-                              ),
+                              child: product.image.startsWith('http')
+                                  ? Image.network(
+                                      product.image,
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (_, __, ___) => Icon(product.icon, size: 46, color: AppColors.primary),
+                                    )
+                                  : Image.asset(
+                                      product.image,
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (_, __, ___) => Icon(product.icon, size: 46, color: AppColors.primary),
+                                    ),
                             )
                           : Icon(
                               product.icon,
@@ -113,12 +157,15 @@ class ProductCard extends StatelessWidget {
                       left: 8,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
+                          horizontal: 7,
+                          vertical: 3,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primary,
+                          gradient: const LinearGradient(colors: [Color(0xFFFF6B4A), AppColors.primary]),
                           borderRadius: BorderRadius.circular(6),
+                          boxShadow: [
+                            BoxShadow(color: AppColors.primary.withOpacity(0.35), blurRadius: 4, offset: const Offset(0, 2)),
+                          ],
                         ),
                         child: Text(
                           '-${product.discountPercent}%',
@@ -130,39 +177,11 @@ class ProductCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: AnimatedBuilder(
-                      animation: FavoritesController.instance,
-                      builder: (context, _) {
-                        final isFav =
-                            FavoritesController.instance.isFavorite(product.id);
-                        return InkWell(
-                          borderRadius: BorderRadius.circular(20),
-                          onTap: () =>
-                              FavoritesController.instance.toggle(product),
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: const BoxDecoration(
-                              color: Colors.white70,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              isFav ? Icons.favorite : Icons.favorite_border,
-                              size: 18,
-                              color: isFav ? AppColors.primary : Colors.grey,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
                 ],
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -170,27 +189,68 @@ class ProductCard extends StatelessWidget {
                     product.name,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.heading3,
+                    style: AppTextStyles.heading3.copyWith(fontSize: 13.5, height: 1.25),
+                  ),
+                  const SizedBox(height: 4),
+
+                  Row(
+                    children: [
+                      const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
+                      const SizedBox(width: 2),
+                      Text(
+                        product.rating.toStringAsFixed(1),
+                        style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(width: 3, height: 3, decoration: const BoxDecoration(color: AppColors.textHint, shape: BoxShape.circle)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Đã bán ${product.soldCount}',
+                          style: AppTextStyles.caption,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 6),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Expanded(
-                        child: Text(
-                          formatVnd(product.price),
-                          style: AppTextStyles.price,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              formatVnd(product.price),
+                              style: AppTextStyles.price.copyWith(fontSize: 15),
+                            ),
+
+                            if (product.hasDiscount)
+                              Text(
+                                formatVnd(product.oldPrice ?? product.price),
+                                style: AppTextStyles.caption.copyWith(
+                                  decoration: TextDecoration.lineThrough,
+                                  color: AppColors.textHint,
+                                ),
+                              ),
+                          ],
                         ),
                       ),
+
                       InkWell(
                         borderRadius: BorderRadius.circular(20),
                         onTap: () => _addToCart(context),
-                        child: const Padding(
-                          padding: EdgeInsets.all(4),
-                          child: Icon(
-                            Icons.add_circle,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
                             color: AppColors.primary,
-                            size: 22,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.add_shopping_cart_rounded,
+                            color: Colors.white,
+                            size: 16,
                           ),
                         ),
                       ),

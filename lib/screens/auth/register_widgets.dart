@@ -6,9 +6,6 @@ import '../../routes/app_routes.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 
-/// ===============================
-/// REGISTER HEADER
-/// ===============================
 class RegisterHeader extends StatelessWidget {
   const RegisterHeader({super.key});
 
@@ -52,28 +49,23 @@ class RegisterHeader extends StatelessWidget {
   }
 }
 
-/// ===============================
-/// REGISTER FORM
-/// ===============================
 class RegisterForm extends StatefulWidget {
   const RegisterForm({super.key});
 
   @override
-  State<RegisterForm> createState() => RegisterFormState(); // 🆕 Đổi từ _RegisterFormState thành RegisterFormState (Public)
+  State<RegisterForm> createState() => RegisterFormState();
 }
 
-class RegisterFormState extends State<RegisterForm> { // 🆕 Xóa dấu gạch dưới để bên ngoài truy cập được
+class RegisterFormState extends State<RegisterForm> {
   bool _hidePassword = true;
   bool _hideConfirmPassword = true;
 
-  // 🆕 Khởi tạo các bộ điều khiển để hứng dữ liệu nhập từ bàn phím
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  // 🆕 Tạo các hàm Getter để file RegisterScreen có thể lấy dữ liệu sạch (.trim() để bỏ khoảng trắng thừa)
   String get nameText => _nameController.text.trim();
   String get emailText => _emailController.text.trim();
   String get phoneText => _phoneController.text.trim();
@@ -81,7 +73,7 @@ class RegisterFormState extends State<RegisterForm> { // 🆕 Xóa dấu gạch 
 
   @override
   void dispose() {
-    // Giải phóng bộ nhớ khi không dùng nữa
+
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
@@ -95,7 +87,7 @@ class RegisterFormState extends State<RegisterForm> { // 🆕 Xóa dấu gạch 
     return Column(
       children: [
         CustomTextField(
-          controller: _nameController, // 🆕 Gán controller
+          controller: _nameController,
           hintText: 'Họ và tên',
           prefixIcon: Icons.person_outline,
         ),
@@ -103,7 +95,7 @@ class RegisterFormState extends State<RegisterForm> { // 🆕 Xóa dấu gạch 
         const SizedBox(height: 18),
 
         CustomTextField(
-          controller: _emailController, // 🆕 Gán controller
+          controller: _emailController,
           hintText: 'Email',
           prefixIcon: Icons.email_outlined,
           keyboardType: TextInputType.emailAddress,
@@ -112,7 +104,7 @@ class RegisterFormState extends State<RegisterForm> { // 🆕 Xóa dấu gạch 
         const SizedBox(height: 18),
 
         CustomTextField(
-          controller: _phoneController, // 🆕 Gán controller
+          controller: _phoneController,
           hintText: 'Số điện thoại',
           prefixIcon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
@@ -121,7 +113,7 @@ class RegisterFormState extends State<RegisterForm> { // 🆕 Xóa dấu gạch 
         const SizedBox(height: 18),
 
         CustomTextField(
-          controller: _passwordController, // 🆕 Gán controller
+          controller: _passwordController,
           hintText: 'Mật khẩu',
           prefixIcon: Icons.lock_outline,
           obscureText: _hidePassword,
@@ -142,7 +134,7 @@ class RegisterFormState extends State<RegisterForm> { // 🆕 Xóa dấu gạch 
         const SizedBox(height: 18),
 
         CustomTextField(
-          controller: _confirmPasswordController, // 🆕 Gán controller
+          controller: _confirmPasswordController,
           hintText: 'Xác nhận mật khẩu',
           prefixIcon: Icons.lock_outline,
           obscureText: _hideConfirmPassword,
@@ -164,29 +156,23 @@ class RegisterFormState extends State<RegisterForm> { // 🆕 Xóa dấu gạch 
   }
 }
 
-/// ===============================
-/// REGISTER BUTTON
-/// ===============================
 class RegisterButton extends StatelessWidget {
-  final VoidCallback onPressed; // 🆕 Khai báo callback nhận sự kiện bấm từ file RegisterScreen
+  final VoidCallback onPressed;
 
   const RegisterButton({
     super.key,
-    required this.onPressed, // 🆕 Bắt buộc truyền hàm xử lý vào đây
+    required this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
     return CustomButton(
       text: 'Đăng ký',
-      onPressed: onPressed, // 🆕 Chạy hàm được truyền từ RegisterScreen
+      onPressed: onPressed,
     );
   }
 }
 
-/// ===============================
-/// REGISTER FOOTER
-/// ===============================
 class RegisterFooter extends StatelessWidget {
   const RegisterFooter({super.key});
 

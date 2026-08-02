@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../config/theme/app_colors.dart';
 import '../../config/theme/app_text_styles.dart';
+import '../../controllers/cart_controller.dart';
+import '../../controllers/profile_controller.dart';
+import '../../controllers/role_controller.dart';
+import '../../routes/app_routes.dart';
+import 'address_screen.dart';
+import '../seller/register_store_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -15,6 +21,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _promoNotification = true;
   bool _orderNotification = true;
 
+  Future<void> _logout(BuildContext context) async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Đăng xuất'),
+        content: const Text('Bạn có chắc chắn muốn đăng xuất khỏi tài khoản?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Huỷ'),
+          ),
+          TextButton(
+            onPressed: () async {
+
+              await FirebaseAuth.instance.signOut();
+
+              RoleController.instance.reset();
+
+              CartController.instance.clearLocalOnly();
+
+              UserProfileController.instance.clearProfile();
+
+              if (context.mounted) {
+                Navigator.of(context).pushNamedAndRemoveUntil(
+                  AppRoutes.login,
+                  (route) => false,
+                );
+              }
+            },
+            child: const Text('Đăng xuất', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -23,6 +66,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(15),
         children: [
+
+          _SectionCard(
+            title: 'Tài khoản',
+            children: [
+              _SimpleTile(
+                icon: Icons.location_on_outlined,
+                title: 'Địa chỉ giao hàng',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AddressScreen()),
+                ),
+              ),
+              _SimpleTile(
+                icon: Icons.storefront_outlined,
+                title: 'Kênh người bán',
+                trailingText: 'Đăng ký bán hàng',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const RegisterStoreScreen()),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
           _SectionCard(
             title: 'Thông báo',
             children: [
@@ -134,6 +199,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 },
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+
+          OutlinedButton.icon(
+            onPressed: () => _logout(context),
+            icon: const Icon(Icons.logout, color: AppColors.error),
+            label: const Text('Đăng xuất', style: TextStyle(color: AppColors.error)),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: AppColors.error),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
           ),
         ],
       ),

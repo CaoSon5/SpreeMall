@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
-// import 'package:firebase_auth/firebase_auth.dart'; // Mở ra nếu bạn dùng Firebase Auth
+import 'package:get/get.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../config/theme/app_colors.dart';
 import '../../config/theme/app_text_styles.dart';
-import '../../controllers/favorites_controller.dart';
 import '../../controllers/profile_controller.dart';
-import '../../routes/app_routes.dart';
-import 'address_screen.dart';
+import '../../controllers/role_controller.dart';
+import '../../controllers/store_controller.dart';
+import '../../models/user_role.dart';
+import '../../models/store.dart';
+import '../../widgets/recommended_products_section.dart';
+import '../admin/admin_dashboard_screen.dart';
+import '../seller/seller_dashboard_screen.dart';
 import 'edit_profile_screen.dart';
 import 'order_history_screen.dart';
 import 'settings_screen.dart';
@@ -23,9 +29,11 @@ class ProfileScreen extends StatelessWidget {
           const SizedBox(height: 12),
           const _OrderStatusSection(),
           const SizedBox(height: 12),
-          const _MenuSection(),
+          const _UtilitiesSection(),
           const SizedBox(height: 12),
-          const _LogoutButton(),
+          const _MenuSection(),
+          const SizedBox(height: 20),
+          const RecommendedProductsSection(),
           const SizedBox(height: 24),
         ],
       ),
@@ -33,7 +41,6 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-/// Header gradient với avatar, tên, email và nút chỉnh sửa hồ sơ.
 class _ProfileHeader extends StatelessWidget {
   const _ProfileHeader();
 
@@ -50,127 +57,229 @@ class _ProfileHeader extends StatelessWidget {
       ),
       child: SafeArea(
         bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          child: AnimatedBuilder(
-            animation: UserProfileController.instance,
-            builder: (context, _) {
-              final profile = UserProfileController.instance;
-              
-              // Xử lý hiển thị chữ cái đầu của tên (Nếu rỗng thì hiển thị kí tự mặc định)
-              final String displayLetter = profile.name.trim().isNotEmpty
-                  ? profile.name.trim()[0].toUpperCase()
-                  : '?';
-                  
-              final String displayName = profile.name.isNotEmpty 
-                  ? profile.name 
-                  : 'Người dùng SpreeMall';
-                  
-              final String displayEmail = profile.email.isNotEmpty 
-                  ? profile.email 
-                  : 'chưa cập nhật email';
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+              child: AnimatedBuilder(
+                animation: UserProfileController.instance,
+                builder: (context, _) {
+                  final profile = UserProfileController.instance;
 
-              return Column(
-                children: [
-                  Row(
+                  final String displayLetter = profile.name.trim().isNotEmpty
+                      ? profile.name.trim()[0].toUpperCase()
+                      : '?';
+
+                  final String displayName = profile.name.isNotEmpty
+                      ? profile.name
+                      : 'Người dùng SpreeMall';
+
+                  final String displayEmail = profile.email.isNotEmpty
+                      ? profile.email
+                      : 'chưa cập nhật email';
+
+                  return Column(
                     children: [
-                      Stack(
+                      Row(
                         children: [
-                          CircleAvatar(
-                            radius: 38,
-                            backgroundColor: Colors.white,
-                            child: Text(
-                              displayLetter,
-                              style: AppTextStyles.heading1.copyWith(
-                                color: AppColors.primary,
-                                fontSize: 30,
-                              ),
+
+                          GestureDetector(
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+                            ),
+                            child: Stack(
+                              children: [
+                                CircleAvatar(
+                                  radius: 38,
+                                  backgroundColor: Colors.white,
+                                  child: Text(
+                                    displayLetter,
+                                    style: AppTextStyles.heading1.copyWith(
+                                      color: AppColors.primary,
+                                      fontSize: 30,
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  right: 0,
+                                  bottom: 0,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.accent,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white, width: 2),
+                                    ),
+                                    child: const Icon(Icons.edit, size: 14, color: Colors.white),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          Positioned(
-                            right: 0,
-                            bottom: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: AppColors.accent,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 2),
-                              ),
-                              child: const Icon(Icons.edit, size: 14, color: Colors.white),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  displayName,
+                                  style: AppTextStyles.heading1.copyWith(color: Colors.white),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  displayEmail,
+                                  style: AppTextStyles.bodyRegular.copyWith(color: Colors.white70),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 6),
+
+                                StreamBuilder<Store?>(
+                                  stream: StoreController.instance.watchMyStore(),
+                                  builder: (context, storeSnapshot) {
+                                    final myStore = storeSnapshot.data;
+                                    final isApprovedSeller = myStore != null && myStore.status == StoreStatus.approved;
+
+                                    return Obx(() {
+                                      final role = RoleController.instance.role.value;
+                                      final String label;
+                                      final IconData icon;
+
+                                      if (role.isAdmin) {
+                                        label = 'Quản trị viên';
+                                        icon = Icons.admin_panel_settings;
+                                      } else if (isApprovedSeller) {
+                                        label = 'Người bán';
+                                        icon = Icons.storefront;
+                                      } else {
+                                        label = 'Khách hàng';
+                                        icon = Icons.person_outline;
+                                      }
+
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.18),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(icon, size: 14, color: Colors.white),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              label,
+                                              style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w600),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    });
+                                  },
+                                ),
+
+                                StreamBuilder<Store?>(
+                                  stream: StoreController.instance.watchMyStore(),
+                                  builder: (context, snapshot) {
+                                    final myStore = snapshot.data;
+                                    if (myStore == null || myStore.status != StoreStatus.approved) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    return Padding(
+                                      padding: const EdgeInsets.only(top: 10),
+                                      child: OutlinedButton.icon(
+                                        onPressed: () {
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(builder: (_) => SellerDashboardScreen(store: myStore)),
+                                          );
+                                        },
+                                        icon: const Icon(Icons.storefront, size: 15, color: Colors.white),
+                                        label: const Text('Vào kênh người bán', style: TextStyle(fontSize: 12.5)),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.white,
+                                          side: const BorderSide(color: Colors.white70),
+                                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+
+                                Obx(() {
+                                  if (!RoleController.instance.role.value.isAdmin) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: 10),
+                                    child: OutlinedButton.icon(
+                                      onPressed: () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
+                                        );
+                                      },
+                                      icon: const Icon(Icons.admin_panel_settings, size: 15, color: Colors.white),
+                                      label: const Text('Vào khu quản trị', style: TextStyle(fontSize: 12.5)),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: Colors.white,
+                                        side: const BorderSide(color: Colors.white70),
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ],
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
                           children: [
-                            Text(
-                              displayName,
-                              style: AppTextStyles.heading1.copyWith(color: Colors.white),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              displayEmail,
-                              style: AppTextStyles.bodyRegular.copyWith(color: Colors.white70),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 10),
-                            OutlinedButton(
-                              onPressed: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => const EditProfileScreen(),
-                                  ),
-                                );
+
+                            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                              stream: FirebaseAuth.instance.currentUser == null
+                                  ? null
+                                  : FirebaseFirestore.instance
+                                      .collection('orders')
+                                      .where('uid', isEqualTo: FirebaseAuth.instance.currentUser!.uid)
+                                      .snapshots(),
+                              builder: (context, snapshot) {
+                                final count = snapshot.data?.docs.length ?? 0;
+                                return _StatItem(label: 'Đơn hàng', value: '$count');
                               },
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.white,
-                                side: const BorderSide(color: Colors.white70),
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                              ),
-                              child: const Text('Chỉnh sửa hồ sơ', style: TextStyle(fontSize: 12.5)),
                             ),
+                            const _StatDivider(),
+                            const _StatItem(label: 'Voucher', value: '2'),
                           ],
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 20),
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      children: [
-                        const _StatItem(label: 'Đơn hàng', value: '4'),
-                        const _StatDivider(),
-                        AnimatedBuilder(
-                          animation: FavoritesController.instance,
-                          builder: (context, _) => _StatItem(
-                            label: 'Yêu thích',
-                            value: '${FavoritesController.instance.count}',
-                          ),
-                        ),
-                        const _StatDivider(),
-                        const _StatItem(label: 'Voucher', value: '2'),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
+                  );
+                },
+              ),
+            ),
+
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                ),
+                icon: const Icon(Icons.settings_outlined, color: Colors.white),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -212,7 +321,75 @@ class _StatDivider extends StatelessWidget {
   }
 }
 
-/// Hàng biểu tượng trạng thái đơn hàng (chờ xác nhận, đang giao, ...)
+class _UtilitiesSection extends StatelessWidget {
+  const _UtilitiesSection();
+
+  static const _utilities = [
+    {'icon': Icons.account_balance_wallet_outlined, 'label': 'Ví\nSpreeMall', 'color': Color(0xFF2196F3)},
+    {'icon': Icons.stars_outlined, 'label': 'SpreeMall\nXu', 'color': Color(0xFFFFA726)},
+    {'icon': Icons.confirmation_number_outlined, 'label': 'Kho\nVoucher', 'color': AppColors.primary},
+    {'icon': Icons.local_shipping_outlined, 'label': 'Miễn phí\nvận chuyển', 'color': AppColors.success},
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 15),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text('Tiện ích của tôi', style: AppTextStyles.heading3),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: _utilities.map((u) {
+              return Expanded(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Tính năng đang được phát triển')),
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: (u['color'] as Color).withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(u['icon'] as IconData, color: u['color'] as Color, size: 22),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          u['label'] as String,
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.caption.copyWith(fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _OrderStatusSection extends StatelessWidget {
   const _OrderStatusSection();
 
@@ -289,143 +466,11 @@ class _OrderStatusSection extends StatelessWidget {
   }
 }
 
-/// Danh sách menu chức năng (thông tin cá nhân, địa chỉ, cài đặt...)
 class _MenuSection extends StatelessWidget {
   const _MenuSection();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 15),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        children: [
-          _MenuTile(
-            icon: Icons.person_outline,
-            label: 'Thông tin cá nhân',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const EditProfileScreen()),
-            ),
-          ),
-          const _MenuDivider(),
-          _MenuTile(
-            icon: Icons.location_on_outlined,
-            label: 'Địa chỉ giao hàng',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const AddressScreen()),
-            ),
-          ),
-          const _MenuDivider(),
-          _MenuTile(
-            icon: Icons.credit_card_outlined,
-            label: 'Phương thức thanh toán',
-            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Tính năng đang được phát triển')),
-            ),
-          ),
-          const _MenuDivider(),
-          _MenuTile(
-            icon: Icons.settings_outlined,
-            label: 'Cài đặt & hỗ trợ',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MenuTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _MenuTile({required this.icon, required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: AppColors.primary, size: 20),
-      ),
-      title: Text(label, style: AppTextStyles.bodyRegular),
-      trailing: const Icon(Icons.chevron_right, color: AppColors.textHint),
-      onTap: onTap,
-    );
-  }
-}
-
-class _MenuDivider extends StatelessWidget {
-  const _MenuDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Divider(height: 1, indent: 16, endIndent: 16);
-  }
-}
-
-/// Nút đăng xuất đã xử lý dọn dẹp data cũ tránh lưu bộ nhớ đệm
-class _LogoutButton extends StatelessWidget {
-  const _LogoutButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 15),
-      child: OutlinedButton.icon(
-        onPressed: () {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Text('Đăng xuất'),
-              content: const Text('Bạn có chắc chắn muốn đăng xuất khỏi tài khoản?'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Huỷ'),
-                ),
-                TextButton(
-                  onPressed: () async {
-                    // 1. Giải phóng tài khoản trên Firebase Auth (nếu dùng)
-                    // await FirebaseAuth.instance.signOut();
-                    
-                    // 2. Clear sạch dữ liệu trên giao diện thông qua controller
-                    UserProfileController.instance.clearProfile();
-
-                    // 3. Điều hướng về màn Login và xoá toàn bộ stack màn hình cũ
-                    if (context.mounted) {
-                      Navigator.of(context).pushNamedAndRemoveUntil(
-                        AppRoutes.login,
-                        (route) => false,
-                      );
-                    }
-                  },
-                  child: const Text('Đăng xuất', style: TextStyle(color: AppColors.error)),
-                ),
-              ],
-            ),
-          );
-        },
-        icon: const Icon(Icons.logout, color: AppColors.error),
-        label: const Text('Đăng xuất', style: TextStyle(color: AppColors.error)),
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: AppColors.error),
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      ),
-    );
+    return const SizedBox.shrink();
   }
 }

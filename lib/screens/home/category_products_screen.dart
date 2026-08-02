@@ -1,19 +1,60 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:spreemall/controllers/brand_controller.dart'; 
+import 'package:spreemall/controllers/brand_controller.dart';
+import '../../models/product.dart';
+import 'brand_products_screen.dart';
+import 'product_grid_section.dart';
 
-class CategoryProductsScreen extends StatelessWidget {
+bool _productMatchesCategoryId(Product p, String categoryId) {
+  final cat = p.category.toLowerCase();
+  final gender = p.gender;
+
+  switch (categoryId) {
+    case 'dien_thoai':
+      return cat.contains('điện thoại');
+    case 'laptop':
+      return cat.contains('laptop');
+    case 'dong_ho':
+      return cat.contains('đồng hồ');
+    case 'tai_nghe':
+      return cat.contains('tai nghe');
+    case 'thoi_trang_nam':
+      return (cat.contains('thời trang') || cat.contains('áo') || cat.contains('quần') || cat.contains('váy')) &&
+          (gender == 'nam' || gender == 'unisex');
+    case 'thoi_trang_nu':
+      return (cat.contains('thời trang') || cat.contains('áo') || cat.contains('quần') || cat.contains('váy')) &&
+          (gender == 'nu' || gender == 'unisex');
+    case 'giay_dep_nam':
+      return (cat.contains('giày') || cat.contains('dép')) && (gender == 'nam' || gender == 'unisex');
+    case 'giay_dep_nu':
+      return (cat.contains('giày') || cat.contains('dép')) && (gender == 'nu' || gender == 'unisex');
+    case 'nha_bep':
+      return cat.contains('bếp') || cat.contains('nồi') || cat.contains('chảo');
+    case 'tv':
+      return cat.contains('tv') || cat.contains('tivi');
+    default:
+      return false;
+  }
+}
+
+class CategoryProductsScreen extends StatefulWidget {
   final String categoryName;
-  final String categoryId; 
+  final String categoryId;
 
   const CategoryProductsScreen({
-    super.key, 
+    super.key,
     required this.categoryName,
     required this.categoryId,
   });
 
-  // Hàm này tạm thời không dùng nữa vì bạn đang gọi trực tiếp qua BrandController().getBrandsByCategoryId(categoryId) ở dưới
+  @override
+  State<CategoryProductsScreen> createState() => _CategoryProductsScreenState();
+}
+
+class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
+  final int _seed = DateTime.now().millisecondsSinceEpoch;
+
   Future<List<Map<String, dynamic>>> _getBrandsFromFirebase(String category) async {
     try {
       QuerySnapshot querySnapshot = await FirebaseFirestore.instance
@@ -25,11 +66,10 @@ class CategoryProductsScreen extends StatelessWidget {
         final data = doc.data() as Map<String, dynamic>;
         return {
           'name': data['name']?.toString() ?? 'Không tên',
-          'logoUrl': data['url']?.toString() ?? '', 
+          'logoUrl': data['url']?.toString() ?? '',
         };
       }).toList();
     } catch (e) {
-      print("Lỗi khi tải dữ liệu từ Firebase: $e");
       return [];
     }
   }
@@ -39,7 +79,7 @@ class CategoryProductsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFD32F2F), 
+        backgroundColor: const Color(0xFFD32F2F),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -54,7 +94,7 @@ class CategoryProductsScreen extends StatelessWidget {
           child: TextField(
             readOnly: true,
             decoration: InputDecoration(
-              hintText: 'Tìm kiếm trong $categoryName Mall',
+              hintText: 'Tìm kiếm trong ${widget.categoryName} Mall',
               hintStyle: const TextStyle(color: Colors.black38, fontSize: 14),
               prefixIcon: const Icon(Icons.search, color: Colors.black45),
               border: InputBorder.none,
@@ -77,7 +117,6 @@ class CategoryProductsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. Khung THƯƠNG HIỆU ƯA CHUỘNG (Đã đổi thành lưới chữ nhật 2 hàng)
             Container(
               color: Colors.white,
               padding: const EdgeInsets.all(12),
@@ -107,9 +146,8 @@ class CategoryProductsScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  
                   FutureBuilder<List<Map<String, dynamic>>>(
-                    future: BrandController().getBrandsByCategoryId(categoryId), 
+                    future: BrandController().getBrandsByCategoryId(widget.categoryId),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(
@@ -135,39 +173,44 @@ class CategoryProductsScreen extends StatelessWidget {
                       final brands = snapshot.data!;
 
                       return SizedBox(
-                        // Tăng chiều cao lên 130 để chứa vừa vặn 2 hàng ô chữ nhật
-                        height: 130, 
+                        height: 130,
                         child: GridView.builder(
-                          scrollDirection: Axis.horizontal, // Cuộn theo chiều ngang
+                          scrollDirection: Axis.horizontal,
                           itemCount: brands.length,
                           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,          // Chia làm 2 hàng cố định
-                            mainAxisSpacing: 8,         // Khoảng cách giữa các ô nằm ngang
-                            crossAxisSpacing: 8,        // Khoảng cách giữa hàng trên và hàng dưới
-                            childAspectRatio: 0.55,     // Tỷ lệ khung hình chữ nhật (Chiều rộng = khoảng 1.8 lần chiều cao)
+                            crossAxisCount: 2,
+                            mainAxisSpacing: 8,
+                            crossAxisSpacing: 8,
+                            childAspectRatio: 0.55,
                           ),
                           itemBuilder: (context, index) {
                             final brand = brands[index];
-                            
+
                             String originalUrl = brand['logoUrl'] ?? '';
                             String displayUrl = '';
 
-                            // Sử dụng proxy để tối ưu kích thước chữ nhật 200x100 và tự tạo nền trắng
                             if (originalUrl.isNotEmpty) {
                               displayUrl = 'https://images.weserv.nl/?url=$originalUrl&w=200&h=100&fit=contain&bg=white';
                             }
 
                             return GestureDetector(
                               onTap: () {
-                                print("Đã chọn thương hiệu: ${brand['name']}");
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => BrandProductsScreen(
+                                      brandName: (brand['name'] ?? '').toString(),
+                                      brandLogoUrl: displayUrl,
+                                    ),
+                                  ),
+                                );
                               },
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: Colors.white,
-                                  shape: BoxShape.rectangle, // Khung hình chữ nhật
-                                  borderRadius: BorderRadius.circular(2), // Bo góc nhẹ tinh tế
+                                  shape: BoxShape.rectangle,
+                                  borderRadius: BorderRadius.circular(2),
                                   border: Border.all(
-                                    color: Colors.grey.shade200, // Viền xám mảnh bao quanh ô
+                                    color: Colors.grey.shade200,
                                     width: 1,
                                   ),
                                 ),
@@ -181,12 +224,11 @@ class CategoryProductsScreen extends StatelessWidget {
                                               displayUrl,
                                               fit: BoxFit.contain,
                                               filterQuality: FilterQuality.high,
-                                              errorBuilder: (context, error, stackTrace) =>
-                                                  const Icon(Icons.broken_image, color: Colors.grey, size: 20),
+                                              errorBuilder: (context, error, stackTrace) => _BrandFallback(name: (brand['name'] ?? '').toString()),
                                             ),
                                           ),
                                         )
-                                      : const Icon(Icons.broken_image, color: Colors.grey, size: 20),
+                                      : _BrandFallback(name: (brand['name'] ?? '').toString()),
                                 ),
                               ),
                             );
@@ -198,10 +240,7 @@ class CategoryProductsScreen extends StatelessWidget {
                 ],
               ),
             ),
-
             const SizedBox(height: 10),
-
-            // 2. Khung GỢI Ý HÔM NAY 
             Container(
               color: Colors.white,
               padding: const EdgeInsets.all(12),
@@ -214,74 +253,90 @@ class CategoryProductsScreen extends StatelessWidget {
                 ),
               ),
             ),
-            
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 0.75,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                ),
-                itemCount: 4, 
-                itemBuilder: (context, index) {
-                  return Card(
-                    color: Colors.white,
-                    elevation: 0.5,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Container(
-                            color: Colors.grey.shade100,
-                            child: const Center(
-                              child: Icon(Icons.image, size: 50, color: Colors.grey),
-                            ),
-                          ),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance.collection('products').snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 30),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+
+                  final allProducts = (snapshot.data?.docs ?? [])
+                      .map((d) => Product.fromMap(d.id, d.data()))
+                      .toList();
+
+                  var related = allProducts
+                      .where((p) => _productMatchesCategoryId(p, widget.categoryId))
+                      .toList();
+
+                  if (related.isEmpty) {
+                    related = allProducts
+                        .where((p) => p.category.toLowerCase().contains(widget.categoryName.toLowerCase()))
+                        .toList();
+                  }
+
+                  related.shuffle(Random(_seed));
+                  final suggested = related.take(8).toList();
+
+                  if (suggested.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 30),
+                      child: Center(
+                        child: Text(
+                          'Chưa có sản phẩm nào ở danh mục này.',
+                          style: TextStyle(color: Colors.black38, fontSize: 13),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFD32F2F),
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                                child: const Text(
-                                  'Mall',
-                                  style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Sản phẩm cao cấp chuyên về $categoryName chất lượng',
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 12, color: Colors.black87),
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                '549.000đ',
-                                style: TextStyle(color: Color(0xFFD32F2F), fontSize: 14, fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                      ),
+                    );
+                  }
+
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 0.7,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
                     ),
+                    itemCount: suggested.length,
+                    itemBuilder: (context, index) => ProductCard(product: suggested[index]),
                   );
                 },
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _BrandFallback extends StatelessWidget {
+  final String name;
+
+  const _BrandFallback({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.storefront_outlined, color: Colors.grey, size: 20),
+          const SizedBox(height: 2),
+          Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 10, color: Colors.black54, fontWeight: FontWeight.w600),
+          ),
+        ],
       ),
     );
   }

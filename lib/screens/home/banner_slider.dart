@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'policy_detail_screen.dart'; 
+import 'policy_detail_screen.dart';
 class BannerSlider extends StatefulWidget {
   const BannerSlider({super.key});
 
@@ -21,7 +21,6 @@ class _BannerSliderState extends State<BannerSlider> {
     _pageController = PageController(initialPage: 0);
   }
 
-  // Hàm kích hoạt chạy tự động chuẩn, chỉ chạy khi có nhiều hơn 1 banner
   void _resetAndStartTimer() {
     _timer?.cancel();
     if (_totalBanners <= 1) return;
@@ -33,7 +32,7 @@ class _BannerSliderState extends State<BannerSlider> {
         } else {
           _currentPage = 0;
         }
-        
+
         _pageController.animateToPage(
           _currentPage,
           duration: const Duration(milliseconds: 600),
@@ -59,7 +58,7 @@ class _BannerSliderState extends State<BannerSlider> {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('banners').snapshots(),
       builder: (context, snapshot) {
-        
+
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 20),
@@ -73,10 +72,9 @@ class _BannerSliderState extends State<BannerSlider> {
 
         final bannerDocs = snapshot.data!.docs;
 
-        // KIỂM TRA ĐỘNG: Khi Firebase trả dữ liệu về lần đầu hoặc số lượng ảnh thay đổi
         if (_totalBanners != bannerDocs.length) {
           _totalBanners = bannerDocs.length;
-          // Đợi widget dựng cấu trúc xong sẽ kích hoạt chu kỳ chạy tự động
+
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _resetAndStartTimer();
           });
@@ -84,7 +82,7 @@ class _BannerSliderState extends State<BannerSlider> {
 
         return Column(
           children: [
-            // Bọc GestureDetector để khi người dùng nhấn giữ vào ảnh thì dừng tự động chạy
+
             GestureDetector(
               onTapDown: (_) => _stopTimer(),
               onTapUp: (_) => _resetAndStartTimer(),
@@ -93,10 +91,10 @@ class _BannerSliderState extends State<BannerSlider> {
                 margin: const EdgeInsets.only(top: 8),
                 width: double.infinity,
                 child: AspectRatio(
-                  aspectRatio: 2.5, // Tỷ lệ vàng khít ảnh, xóa bỏ khoảng xám trên dưới
+                  aspectRatio: 2.5,
                   child: Stack(
                     children: [
-                      // Lắng nghe thao tác cuộn để tắt/bật Timer, tránh bị xung đột giật lag
+
                       NotificationListener<ScrollNotification>(
                         onNotification: (ScrollNotification notification) {
                           if (notification is ScrollStartNotification) {
@@ -109,10 +107,9 @@ class _BannerSliderState extends State<BannerSlider> {
                         child: PageView.builder(
                           controller: _pageController,
                           itemCount: _totalBanners,
-                          physics: const BouncingScrollPhysics(), // Giúp kéo vuốt mượt mà trên cả Web lẫn Điện thoại
+                          physics: const BouncingScrollPhysics(),
                           onPageChanged: (index) {
-                            // Cập nhật vị trí trang hiện tại mà KHÔNG dùng setState ở đây 
-                            // nhằm giải phóng PageView khỏi việc bị khóa cứng luồng kéo vuốt.
+
                             _currentPage = index;
                           },
                           itemBuilder: (context, index) {
@@ -123,7 +120,7 @@ class _BannerSliderState extends State<BannerSlider> {
                               height: double.infinity,
                               child: Image.asset(
                                 imageUrl,
-                                fit: BoxFit.fill, // Ép ảnh phủ kín khít khung viền ngang dọc
+                                fit: BoxFit.fill,
                                 errorBuilder: (context, error, stackTrace) => Container(
                                   color: Colors.grey.shade200,
                                   child: const Center(
@@ -136,14 +133,13 @@ class _BannerSliderState extends State<BannerSlider> {
                         ),
                       ),
 
-                      // Thanh chấm tròn (Dots Indicator) - Tự động đồng bộ theo trang lướt bằng luồng riêng
                       Positioned(
                         bottom: 12,
                         left: 20,
                         child: ListenableBuilder(
                           listenable: _pageController,
                           builder: (context, child) {
-                            // Tính toán vị trí trang hiển thị dựa trên chỉ số cuộn thực tế của PageController
+
                             int activePage = 0;
                             if (_pageController.hasClients && _pageController.page != null) {
                               activePage = _pageController.page!.round();
@@ -175,7 +171,6 @@ class _BannerSliderState extends State<BannerSlider> {
               ),
             ),
 
-            // --- PHẦN THÊM MỚI: Dòng thông tin tiện ích ngay dưới Banner ---
             Container(
               color: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
@@ -204,7 +199,6 @@ class _BannerSliderState extends State<BannerSlider> {
   }
 }
 
-// Widget con cấu trúc chung cho từng mục Tiện ích (Có khả năng click chuyển màn hình)
 class _PolicyItem extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -214,7 +208,7 @@ class _PolicyItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      // Bắt sự kiện chạm vào dòng thông tin cam kết
+
       onTap: () {
         Navigator.push(
           context,
@@ -225,7 +219,7 @@ class _PolicyItem extends StatelessWidget {
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        color: Colors.transparent, // Bọc màu nền trong suốt giúp vùng chạm ăn chuột/tay nhạy hơn
+        color: Colors.transparent,
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [

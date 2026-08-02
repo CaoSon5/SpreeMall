@@ -20,7 +20,7 @@ class SizeGuideBottomSheet extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Table(
-            // Bê nguyên phần Table phức tạp của bạn vào đây...
+
           ),
         ],
       ),

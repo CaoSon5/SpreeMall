@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../config/theme/app_colors.dart';
 import '../../config/theme/app_text_styles.dart';
-import '../../controllers/profile_controller.dart'; // 🆕 IMPORT CONTROLLER CỦA BẠN
+import '../../controllers/profile_controller.dart';
 import '../../routes/app_routes.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
@@ -50,23 +50,19 @@ class LoginHeader extends StatelessWidget {
   }
 }
 
-/// ===============================
-/// LOGIN FORM (Cập nhật để expose dữ liệu ra ngoài qua Key)
-/// ===============================
 class LoginForm extends StatefulWidget {
   const LoginForm({super.key});
 
   @override
-  State<LoginForm> createState() => LoginFormState(); // Đổi từ _LoginFormState thành LoginFormState (xóa dấu gạch dưới)
+  State<LoginForm> createState() => LoginFormState();
 }
 
-class LoginFormState extends State<LoginForm> { // Xóa dấu gạch dưới để public class
+class LoginFormState extends State<LoginForm> {
   bool _obscurePassword = true;
-  
+
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  // 🆕 Dùng getter để LoginScreen bên ngoài có thể lấy text
   String get emailText => _emailController.text.trim();
   String get passwordText => _passwordController.text.trim();
 
@@ -120,11 +116,8 @@ class LoginFormState extends State<LoginForm> { // Xóa dấu gạch dưới đ�
   }
 }
 
-/// ===============================
-/// LOGIN BUTTON (Nhận sự kiện onPressed trực tiếp từ Screen)
-/// ===============================
 class LoginButton extends StatelessWidget {
-  final VoidCallback onPressed; // 🆕 Thay đổi nhận sự kiện bấm từ bên ngoài
+  final VoidCallback onPressed;
 
   const LoginButton({super.key, required this.onPressed});
 
@@ -137,9 +130,6 @@ class LoginButton extends StatelessWidget {
   }
 }
 
-/// ===============================
-/// SOCIAL LOGIN
-/// ===============================
 class SocialLogin extends StatelessWidget {
   const SocialLogin({super.key});
 
@@ -167,9 +157,7 @@ class SocialLogin extends StatelessWidget {
           height: 52,
           child: OutlinedButton.icon(
             onPressed: () {
-              // 🆕 Logic Đăng nhập bằng Google tương lai
-              // Sau khi đăng nhập thành công, bạn cũng gọi:
-              // UserProfileController.instance.updateProfile(name: googleName, email: googleEmail);
+
             },
             icon: const Icon(
               Icons.g_mobiledata,
@@ -190,9 +178,6 @@ class SocialLogin extends StatelessWidget {
   }
 }
 
-/// ===============================
-/// LOGIN FOOTER
-/// ===============================
 class LoginFooter extends StatelessWidget {
   const LoginFooter({super.key});
 

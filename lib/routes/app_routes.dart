@@ -5,24 +5,28 @@ import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/splash/splash_screen.dart';
-import '../screens/checkout/checkout_screen.dart'; // File checkout bạn đã import sẵn
+import '../screens/checkout/checkout_screen.dart';
+import '../screens/admin/admin_dashboard_screen.dart';
+import '../screens/admin/admin_product_management_screen.dart';
+import '../screens/admin/admin_order_management_screen.dart';
+import '../screens/admin/admin_user_management_screen.dart';
+import '../middleware/admin_middleware.dart';
 
 class AppRoutes {
   AppRoutes._();
 
-  // ===============================
-  // Tên Route (Đường dẫn trang)
-  // ===============================
   static const String splash = "/";
   static const String login = "/login";
   static const String register = "/register";
   static const String forgotPassword = "/forgot-password";
   static const String home = "/home";
-  static const String checkout = "/checkout"; // 🆕 Định nghĩa đường dẫn cho trang thanh toán
+  static const String checkout = "/checkout";
 
-  // ===============================
-  // Danh sách trang quản lý bằng GetX
-  // ===============================
+  static const String adminDashboard = "/admin";
+  static const String adminProducts = "/admin/products";
+  static const String adminOrders = "/admin/orders";
+  static const String adminUsers = "/admin/users";
+
   static final List<GetPage> routes = [
     GetPage(
       name: splash,
@@ -46,7 +50,28 @@ class AppRoutes {
     ),
     GetPage(
       name: checkout,
-      page: () => const CheckoutScreen(), // 🆕 Khai báo trang thanh toán vào hệ thống GetX
+      page: () => const CheckoutScreen(),
+    ),
+
+    GetPage(
+      name: adminDashboard,
+      page: () => const AdminDashboardScreen(),
+      middlewares: [AdminMiddleware()],
+    ),
+    GetPage(
+      name: adminProducts,
+      page: () => const AdminProductManagementScreen(),
+      middlewares: [AdminMiddleware()],
+    ),
+    GetPage(
+      name: adminOrders,
+      page: () => const AdminOrderManagementScreen(),
+      middlewares: [AdminMiddleware()],
+    ),
+    GetPage(
+      name: adminUsers,
+      page: () => const AdminUserManagementScreen(),
+      middlewares: [AdminMiddleware()],
     ),
   ];
 }

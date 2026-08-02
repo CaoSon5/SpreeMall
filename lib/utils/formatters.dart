@@ -1,7 +1,6 @@
 
 library;
 
-
 String formatVnd(num amount) {
   final str = amount.round().toString();
   final reversed = str.split('').reversed.toList();

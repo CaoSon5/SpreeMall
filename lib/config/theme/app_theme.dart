@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 import 'app_text_styles.dart';
 
-/// Cấu hình ThemeData dùng chung cho toàn bộ MaterialApp.
-/// Dùng Material 3 (useMaterial3: true).
 class AppTheme {
   AppTheme._();
 

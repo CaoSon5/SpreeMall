@@ -3,6 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
 import 'profile_controller.dart';
+import 'role_controller.dart';
+import 'cart_controller.dart';
+import '../models/user_role.dart';
 import '../routes/app_routes.dart';
 
 class AuthController {
@@ -36,6 +39,8 @@ class AuthController {
           'phone': phone,
           'gender': 'Nam',
           'birthday': '',
+          'role': UserRole.user.value,
+
           'createdAt': FieldValue.serverTimestamp(),
         });
 
@@ -46,6 +51,10 @@ class AuthController {
           gender: 'Nam',
           birthday: '',
         );
+
+        RoleController.instance.setRole(UserRole.user);
+
+        CartController.instance.clearLocalOnly();
 
         if (context.mounted) Navigator.of(context).pop();
 
@@ -64,7 +73,7 @@ class AuthController {
       String message = 'Đăng ký thất bại';
       if (e.code == 'weak-password') message = 'Mật khẩu quá yếu.';
       if (e.code == 'email-already-in-use') message = 'Email đã tồn tại.';
-      
+
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     } catch (e) {
       if (context.mounted) Navigator.of(context).pop();

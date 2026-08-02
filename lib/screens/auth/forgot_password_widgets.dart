@@ -5,9 +5,6 @@ import '../../config/theme/app_text_styles.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 
-/// ===============================
-/// FORGOT PASSWORD HEADER
-/// ===============================
 class ForgotPasswordHeader extends StatelessWidget {
   const ForgotPasswordHeader({super.key});
 
@@ -52,9 +49,6 @@ class ForgotPasswordHeader extends StatelessWidget {
   }
 }
 
-/// ===============================
-/// FORGOT PASSWORD FORM
-/// ===============================
 class ForgotPasswordForm extends StatefulWidget {
   final TextEditingController controller;
 
@@ -79,9 +73,6 @@ class _ForgotPasswordFormState extends State<ForgotPasswordForm> {
   }
 }
 
-/// ===============================
-/// FORGOT PASSWORD BUTTON
-/// ===============================
 class ForgotPasswordButton extends StatefulWidget {
   final TextEditingController controller;
 
@@ -112,7 +103,6 @@ class _ForgotPasswordButtonState extends State<ForgotPasswordButton> {
 
     setState(() => _isLoading = true);
 
-    // Giả lập thời gian gửi yêu cầu (chưa kết nối backend)
     await Future.delayed(const Duration(milliseconds: 900));
 
     if (!mounted) return;
@@ -172,9 +162,6 @@ class _ForgotPasswordButtonState extends State<ForgotPasswordButton> {
   }
 }
 
-/// ===============================
-/// FORGOT PASSWORD FOOTER
-/// ===============================
 class ForgotPasswordFooter extends StatelessWidget {
   const ForgotPasswordFooter({super.key});
 

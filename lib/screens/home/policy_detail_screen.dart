@@ -15,7 +15,7 @@ class PolicyDetailScreen extends StatelessWidget {
     onPressed: () => Navigator.pop(context),
   ),
   title: const Text(
-    'An tâm mua sắm cùng SpreeMall', // Hợp thức hóa thương hiệu SpreeMall của bạn
+    'An tâm mua sắm cùng SpreeMall',
     style: TextStyle(
       color: Colors.black87,
       fontSize: 18,

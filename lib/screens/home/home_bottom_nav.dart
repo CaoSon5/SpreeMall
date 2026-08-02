@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../config/theme/app_colors.dart';
 import '../../controllers/cart_controller.dart';
-import '../../controllers/favorites_controller.dart';
 
 class HomeBottomNav extends StatelessWidget {
   final int currentIndex;
@@ -48,13 +47,9 @@ class HomeBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([
-        CartController.instance,
-        FavoritesController.instance,
-      ]),
+      animation: CartController.instance,
       builder: (context, _) {
         final cartCount = CartController.instance.totalQuantity;
-        final favCount = FavoritesController.instance.count;
 
         return BottomNavigationBar(
           currentIndex: currentIndex,
@@ -69,9 +64,9 @@ class HomeBottomNav extends StatelessWidget {
               label: "Trang chủ",
             ),
             BottomNavigationBarItem(
-              icon: _iconWithBadge(Icons.favorite_border, favCount),
-              activeIcon: _iconWithBadge(Icons.favorite, favCount),
-              label: "Yêu thích",
+              icon: const Icon(Icons.notifications_none_rounded),
+              activeIcon: const Icon(Icons.notifications_rounded),
+              label: "Thông báo",
             ),
             BottomNavigationBarItem(
               icon: _iconWithBadge(Icons.shopping_cart_outlined, cartCount),

@@ -9,10 +9,8 @@ import 'register_widgets.dart';
 class RegisterScreen extends StatelessWidget {
   const RegisterScreen({super.key});
 
-  // 🆕 Tạo GlobalKey để đứng từ ngoài RegisterScreen truy cập dữ liệu bên trong RegisterForm
   static final GlobalKey<RegisterFormState> _formKey = GlobalKey<RegisterFormState>();
 
-  // 🆕 Hàm xử lý logic Đăng ký tài khoản trực tiếp lên Firebase Auth & Firestore
   Future<void> _onRegister(BuildContext context, {
     required String email,
     required String password,
@@ -20,14 +18,13 @@ class RegisterScreen extends StatelessWidget {
     required String phone,
   }) async {
     try {
-      // Hiển thị vòng tròn Loading để người dùng không bấm lung tung khi đang tạo dữ liệu
+
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (_) => const Center(child: CircularProgressIndicator()),
       );
 
-      // 1. Tạo tài khoản đăng nhập trên Firebase Authentication
       UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
         email: email,
@@ -37,7 +34,7 @@ class RegisterScreen extends StatelessWidget {
       final User? firebaseUser = userCredential.user;
 
       if (firebaseUser != null) {
-        // 2. Tự động lưu thông tin cá nhân bổ sung xuống Cloud Firestore collection 'users'
+
         await FirebaseFirestore.instance
             .collection('users')
             .doc(firebaseUser.uid)
@@ -46,12 +43,11 @@ class RegisterScreen extends StatelessWidget {
           'name': name,
           'email': email,
           'phone': phone,
-          'gender': 'Nam', // Mặc định khi đăng ký mới
-          'birthday': '',   // Mặc định khi đăng ký mới
+          'gender': 'Nam',
+          'birthday': '',
           'createdAt': FieldValue.serverTimestamp(),
         });
 
-        // 3. Đồng bộ ngay vào Profile Controller nội bộ để hiển thị trên giao diện ProfileScreen
         UserProfileController.instance.update(
           name: name,
           email: email,
@@ -60,10 +56,8 @@ class RegisterScreen extends StatelessWidget {
           birthday: '',
         );
 
-        // Đóng hộp thoại Loading
         if (context.mounted) Navigator.of(context).pop();
 
-        // Hiện thông báo chào mừng
         Get.snackbar(
           'Thành công',
           'Tài khoản đã được đăng ký thành công!',
@@ -72,12 +66,11 @@ class RegisterScreen extends StatelessWidget {
           colorText: Colors.white,
         );
 
-        // 4. Đưa thẳng người dùng vào màn hình chính (Home)
         Get.offAllNamed(AppRoutes.home);
       }
     } on FirebaseAuthException catch (e) {
-      if (context.mounted) Navigator.of(context).pop(); // Đóng Loading
-      
+      if (context.mounted) Navigator.of(context).pop();
+
       String message = 'Đăng ký thất bại';
       if (e.code == 'weak-password') {
         message = 'Mật khẩu quá yếu (Tối thiểu 6 ký tự).';
@@ -89,7 +82,7 @@ class RegisterScreen extends StatelessWidget {
 
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     } catch (e) {
-      if (context.mounted) Navigator.of(context).pop(); // Đóng Loading
+      if (context.mounted) Navigator.of(context).pop();
       print("Lỗi hệ thống đăng ký: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Đã xảy ra lỗi hệ thống. Vui lòng thử lại!')),
@@ -112,23 +105,20 @@ class RegisterScreen extends StatelessWidget {
               children: [
                 const RegisterHeader(),
 
-                // 🆕 Gán key vào Form để tí nữa Button lôi dữ liệu ra
                 RegisterForm(key: _formKey),
 
                 const SizedBox(height: 24),
 
-                // 🆕 Truyền hành động bấm nút Đăng ký vào RegisterButton
                 RegisterButton(
                   onPressed: () {
                     final formState = _formKey.currentState;
                     if (formState != null) {
-                      // Trích xuất chuỗi chữ nhập từ các ô TextField bên trong Form
+
                       final name = formState.nameText;
                       final email = formState.emailText;
                       final phone = formState.phoneText;
                       final password = formState.passwordText;
 
-                      // Kiểm tra cơ bản xem điền đủ thông tin chưa trước khi bắn lên Firebase
                       if (name.isEmpty || email.isEmpty || phone.isEmpty || password.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Vui lòng điền đầy đủ tất cả các trường dữ liệu!')),
@@ -136,7 +126,6 @@ class RegisterScreen extends StatelessWidget {
                         return;
                       }
 
-                      // Kích hoạt hàm xử lý đăng ký thật
                       _onRegister(
                         context,
                         email: email,

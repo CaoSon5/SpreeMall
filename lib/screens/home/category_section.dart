@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'category_products_screen.dart'; // <-- 1. THÊM IMPORT: Nhớ chỉnh lại đường dẫn (path) cho đúng vị trí file trong project của bạn
+import 'category_products_screen.dart';
 
 class CategorySection extends StatelessWidget {
   const CategorySection({super.key});
 
-  // 🌟 ĐÃ CẬP NHẬT: Đồng bộ thêm khóa "id" cho từng danh mục để hệ thống tự động nhận diện logo thương hiệu khi sang trang mới
   final List<Map<String, dynamic>> categories = const [
     {
       "id": "dien_thoai",
@@ -22,7 +21,7 @@ class CategorySection extends StatelessWidget {
       "title": "Đồng hồ",
     },
     {
-      "id": "tai_nghe", // 🎧 Đã sửa thành tai_nghe đồng bộ với Firebase của bạn
+      "id": "tai_nghe",
       "iconUrl": "https://cdn-icons-png.flaticon.com/128/6191/6191093.png",
       "title": "Tai nghe",
     },
@@ -82,9 +81,8 @@ class CategorySection extends StatelessWidget {
 
         const SizedBox(height: 5),
 
-        // Danh sách cuộn ngang sử dụng ListView.builder
         SizedBox(
-          height: 115, // Tăng nhẹ chiều cao để vừa vặn cấu trúc Image
+          height: 115,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.only(left: 15, right: 5),
@@ -95,20 +93,20 @@ class CategorySection extends StatelessWidget {
               return Padding(
                 padding: const EdgeInsets.only(right: 20),
                 child: GestureDetector(
-                  // 2. ĐÃ SỬA ONDOWNCLICK: Tự động gửi cả title và id sang màn hình CategoryProductsScreen
+
                   onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => CategoryProductsScreen(
-                          categoryName: item["title"] ?? "Danh mục", // Truyền chuỗi chữ "Điện thoại", "Đồng hồ"...
-                          categoryId: item["id"] ?? "",              // 🌟 TRUYỀN TỰ ĐỘNG: Gửi id danh mục sang màn hình mới
+                          categoryName: item["title"] ?? "Danh mục",
+                          categoryId: item["id"] ?? "",
                         ),
                       ),
                     );
                   },
                   child: SizedBox(
-                    width: 75, // CỐ ĐỊNH CHIỀU RỘNG MỖI Ô ĐỂ KHOẢNG CÁCH ĐỀU TĂM TẮP
+                    width: 75,
                     child: Column(
                       children: [
                         Container(
@@ -144,25 +142,24 @@ class CategorySection extends StatelessWidget {
                                   ),
                                 );
                               },
-                              errorBuilder: (context, error, stackTrace) => 
+                              errorBuilder: (context, error, stackTrace) =>
                                   const Icon(Icons.image_not_supported, color: Colors.orange, size: 20),
                             ),
                           ),
                         ),
-                      
+
                         const SizedBox(height: 8),
-                        
-                        // Chữ hiển thị tên danh mục
+
                         Text(
                           item["title"],
-                          textAlign: TextAlign.center, // Chữ luôn ở giữa ô
-                          maxLines: 2, // Tối đa 2 dòng
-                          overflow: TextOverflow.ellipsis, // Nếu dài quá tự có dấu ...
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                             color: Colors.black87,
-                            height: 1.2, // Giảm khoảng cách dòng cho gọn
+                            height: 1.2,
                           ),
                         ),
                       ],

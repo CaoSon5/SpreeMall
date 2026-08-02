@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../config/theme/app_colors.dart';
 import '../../config/theme/app_text_styles.dart';
 import '../../controllers/cart_controller.dart';
-import '../../controllers/favorites_controller.dart';
+import '../../controllers/checkout_controller.dart';
+import '../../controllers/profile_controller.dart';
 import '../../models/product.dart';
+import '../../models/order_status.dart';
+import '../../routes/app_routes.dart';
 import '../../utils/formatters.dart';
+import '../home/brand_products_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -18,39 +25,180 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int _quantity = 1;
-  late String _selectedSize; // Sẽ khởi tạo động trong initState
-  late List<String> _sizes;  // Danh sách kích cỡ động theo loại sản phẩm
+  String? _selectedSize;
+  late List<String> _sizes;
+  int _currentImageIndex = 0;
+  late final PageController _imagePageController;
+  bool _checkingReviewEligibility = true;
+  bool _canReview = false;
 
   Product get product => widget.product;
 
-  // Kiểm tra xem sản phẩm có phải giày dép hay không dựa vào category (hoặc name)
+  bool get _hasSizes => _sizes.isNotEmpty;
+
   bool get _isShoeProduct {
-    final categoryLower = product.category.toLowerCase();
-    final nameLower = product.name.toLowerCase();
-    
-    return categoryLower.contains('shoe') || 
-           categoryLower.contains('giày') || 
-           categoryLower.contains('dép') ||
-           categoryLower.contains('sneaker') ||
-           // Các thương hiệu giày phổ biến nếu bạn lưu category theo hãng
-           categoryLower.contains('adidas') || 
-           categoryLower.contains('nike') || 
-           categoryLower.contains('puma') ||
-           nameLower.contains('giày') ||
-           nameLower.contains('dép');
+    if (_sizes.isEmpty) return false;
+    return num.tryParse(_sizes.first) != null;
   }
 
   @override
   void initState() {
     super.initState();
-    // Tự động phân loại danh sách kích cỡ khi mở màn hình chi tiết
-    if (_isShoeProduct) {
-      _sizes = ['38', '39', '40', '41', '42'];
-      _selectedSize = '40'; // Size giày mặc định
-    } else {
-      _sizes = ['S', 'M', 'L', 'XL', 'XXL'];
-      _selectedSize = 'M';  // Size quần áo mặc định
+
+    _sizes = product.sizes;
+    _selectedSize = _sizes.isNotEmpty ? _sizes.first : null;
+    _imagePageController = PageController();
+    _checkReviewEligibility();
+  }
+
+  Future<void> _checkReviewEligibility() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      setState(() => _checkingReviewEligibility = false);
+      return;
     }
+
+    try {
+      final ordersSnap = await FirebaseFirestore.instance
+          .collection('orders')
+          .where('uid', isEqualTo: uid)
+          .where('status', isEqualTo: OrderStatus.delivered.value)
+          .get();
+
+      bool purchased = false;
+      for (final doc in ordersSnap.docs) {
+        final items = (doc.data()['items'] as List<dynamic>? ?? []);
+        for (final raw in items) {
+          final item = raw as Map<String, dynamic>;
+          if (item['productId'] == product.id) {
+            purchased = true;
+            break;
+          }
+        }
+        if (purchased) break;
+      }
+
+      if (mounted) {
+        setState(() {
+          _canReview = purchased;
+          _checkingReviewEligibility = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _checkingReviewEligibility = false);
+    }
+  }
+
+  void _openReviewDialog() {
+    int rating = 5;
+    final commentCtrl = TextEditingController();
+    bool saving = false;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text('Đánh giá sản phẩm'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Chọn số sao:'),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: List.generate(5, (index) {
+                      final starValue = index + 1;
+                      return IconButton(
+                        onPressed: () => setDialogState(() => rating = starValue),
+                        icon: Icon(
+                          starValue <= rating ? Icons.star_rounded : Icons.star_border_rounded,
+                          color: Colors.amber,
+                          size: 28,
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: commentCtrl,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      hintText: 'Chia sẻ cảm nhận của bạn về sản phẩm...',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Huỷ')),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          setDialogState(() => saving = true);
+                          final ok = await _submitReview(rating, commentCtrl.text.trim());
+                          if (context.mounted) Navigator.pop(context);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(ok ? '✅ Cảm ơn bạn đã đánh giá!' : '❌ Có lỗi, vui lòng thử lại')),
+                            );
+                          }
+                        },
+                  child: saving
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Gửi đánh giá', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<bool> _submitReview(int rating, String comment) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return false;
+
+    try {
+      final name = UserProfileController.instance.name;
+      await FirebaseFirestore.instance.collection('reviews').doc('${uid}_${product.id}').set({
+        'productId': product.id,
+        'uid': uid,
+        'userName': name.isNotEmpty ? name : 'Người dùng ẩn danh',
+        'rating': rating,
+        'comment': comment,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      final allReviews = await FirebaseFirestore.instance
+          .collection('reviews')
+          .where('productId', isEqualTo: product.id)
+          .get();
+
+      if (allReviews.docs.isNotEmpty) {
+        final total = allReviews.docs.fold<int>(0, (sum, d) => sum + ((d.data()['rating'] ?? 0) as int));
+        final average = total / allReviews.docs.length;
+
+        await FirebaseFirestore.instance.collection('products').doc(product.id).update({
+          'rating': double.parse(average.toStringAsFixed(1)),
+        });
+      }
+
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _imagePageController.dispose();
+    super.dispose();
   }
 
   void _increase() {
@@ -66,7 +214,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   void _addToCart({bool showMessage = true}) {
-    CartController.instance.addProduct(product, quantity: _quantity);
+    CartController.instance.addProduct(product, quantity: _quantity, size: _selectedSize);
     if (showMessage) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -75,7 +223,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           backgroundColor: AppColors.success,
           duration: const Duration(milliseconds: 1500),
           content: Text(
-            '🎉 Đã thêm $_quantity x "${product.name}" (Size $_selectedSize) vào giỏ hàng',
+            _selectedSize != null
+                ? '🎉 Đã thêm $_quantity x "${product.name}" (Size $_selectedSize) vào giỏ hàng'
+                : '🎉 Đã thêm $_quantity x "${product.name}" vào giỏ hàng',
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
         ),
@@ -84,38 +234,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   void _buyNow() {
-    _addToCart(showMessage: false);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: Row(
-          children: const [
-            Icon(Icons.check_circle_rounded, color: AppColors.success, size: 28),
-            SizedBox(width: 10),
-            Text('Đặt hàng thành công', style: TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Text(
-          'Bạn đã đặt mua thành công số lượng $_quantity sản phẩm "${product.name}" - Size $_selectedSize.\n\nHệ thống đang xử lý đơn hàng của bạn.',
-          style: AppTextStyles.bodyRegular.copyWith(height: 1.4),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pop();
-            },
-            child: const Text('Tuyệt vời', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          ),
-        ],
-      ),
-    );
+
+    CheckoutController.instance.startQuickBuy(product, quantity: _quantity, size: _selectedSize);
+    Get.toNamed(AppRoutes.checkout);
   }
 
-  // Hàm mở Bottom Sheet hiển thị Hướng dẫn chọn Size dựa vào loại sản phẩm
   void _showSizeGuide() {
     showModalBottomSheet(
       context: context,
@@ -132,7 +255,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  _isShoeProduct ? 'Bảng Chọn Size Giày Chuẩn' : 'Bảng Hướng Dẫn Chọn Kích Cỡ Áo Quần', 
+                  _isShoeProduct ? 'Bảng Chọn Size Giày Chuẩn' : 'Bảng Hướng Dẫn Chọn Kích Cỡ Áo Quần',
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
                 ),
                 IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
@@ -141,7 +264,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             const SizedBox(height: 16),
             Table(
               border: TableBorder.all(color: Colors.grey[300]!, width: 1, borderRadius: BorderRadius.circular(8)),
-              children: _isShoeProduct 
+              children: _isShoeProduct
                 ? [
                     TableRow(
                       decoration: BoxDecoration(color: Colors.grey[100]),
@@ -221,8 +344,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isNetworkImage = product.image.startsWith('http://') || product.image.startsWith('https://');
-
     return Scaffold(
       backgroundColor: const Color(0xfff8f9fa),
       body: Stack(
@@ -231,59 +352,152 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Khối hình ảnh sản phẩm lớn
+
                 Container(
-                  height: MediaQuery.of(context).size.height * 0.45,
                   width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: product.iconBgColor ?? Colors.grey[200],
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(32),
-                      bottomRight: Radius.circular(32),
-                    ),
-                  ),
-                  child: Stack(
-                    alignment: Alignment.center,
+                  color: Colors.white,
+                  padding: const EdgeInsets.only(top: 8, bottom: 12),
+                  child: Column(
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.only(top: 60, bottom: 30, left: 24, right: 24),
-                        child: Hero(
-                          tag: 'product_${product.id}',
-                          child: product.image.isNotEmpty
-                              ? (isNetworkImage
-                                  ? Image.network(product.image, fit: BoxFit.contain)
-                                  : Image.asset(product.image, fit: BoxFit.contain))
-                              : Icon(product.icon, size: 140, color: AppColors.primary),
+                      SizedBox(
+                        height: 320,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 8),
+                              child: Hero(
+                                tag: 'product_${product.id}',
+                                child: product.allImages.isEmpty
+                                    ? Icon(product.icon, size: 140, color: AppColors.primary)
+                                    : PageView.builder(
+                                        controller: _imagePageController,
+                                        itemCount: product.allImages.length,
+                                        onPageChanged: (index) => setState(() => _currentImageIndex = index),
+                                        itemBuilder: (context, index) {
+                                          final imgUrl = product.allImages[index];
+                                          final isNetwork = imgUrl.startsWith('http://') || imgUrl.startsWith('https://');
+                                          return isNetwork
+                                              ? Image.network(
+                                                  imgUrl,
+                                                  fit: BoxFit.contain,
+                                                  errorBuilder: (_, __, ___) => Icon(product.icon, size: 140, color: AppColors.primary),
+                                                )
+                                              : Image.asset(
+                                                  imgUrl,
+                                                  fit: BoxFit.contain,
+                                                  errorBuilder: (_, __, ___) => Icon(product.icon, size: 140, color: AppColors.primary),
+                                                );
+                                        },
+                                      ),
+                              ),
+                            ),
+
+                            if (product.allImages.length > 1) ...[
+                              Positioned(
+                                left: 4,
+                                child: _ImageNavButton(
+                                  icon: Icons.chevron_left_rounded,
+                                  visible: _currentImageIndex > 0,
+                                  onTap: () => _imagePageController.previousPage(
+                                    duration: const Duration(milliseconds: 250),
+                                    curve: Curves.easeOut,
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                right: 4,
+                                child: _ImageNavButton(
+                                  icon: Icons.chevron_right_rounded,
+                                  visible: _currentImageIndex < product.allImages.length - 1,
+                                  onTap: () => _imagePageController.nextPage(
+                                    duration: const Duration(milliseconds: 250),
+                                    curve: Curves.easeOut,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            if (product.hasDiscount)
+                              Positioned(
+                                top: 8,
+                                left: 20,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.redAccent,
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.redAccent.withOpacity(0.3),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 3),
+                                      )
+                                    ],
+                                  ),
+                                  child: Text(
+                                    'Giảm ${product.discountPercent}%',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
-                      if (product.hasDiscount)
-                        Positioned(
-                          top: 110,
-                          left: 20,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.redAccent,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.redAccent.withOpacity(0.3),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 3),
-                                )
-                              ],
-                            ),
-                            child: Text(
-                              'Giảm ${product.discountPercent}%',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                            ),
+
+                      if (product.allImages.length > 1) ...[
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          height: 60,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            itemCount: product.allImages.length,
+                            separatorBuilder: (_, __) => const SizedBox(width: 8),
+                            itemBuilder: (context, index) {
+                              final imgUrl = product.allImages[index];
+                              final isNetwork = imgUrl.startsWith('http://') || imgUrl.startsWith('https://');
+                              final isActive = index == _currentImageIndex;
+
+                              return GestureDetector(
+                                onTap: () => _imagePageController.animateToPage(
+                                  index,
+                                  duration: const Duration(milliseconds: 250),
+                                  curve: Curves.easeOut,
+                                ),
+                                child: Container(
+                                  width: 56,
+                                  height: 56,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: isActive ? AppColors.primary : Colors.grey[300]!,
+                                      width: isActive ? 2 : 1,
+                                    ),
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: isNetwork
+                                        ? Image.network(
+                                            imgUrl,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => Icon(product.icon, size: 20, color: AppColors.primary),
+                                          )
+                                        : Image.asset(
+                                            imgUrl,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => Icon(product.icon, size: 20, color: AppColors.primary),
+                                          ),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ),
+                      ],
                     ],
                   ),
                 ),
 
-                // Khối thông tin chi tiết dạng Card xếp lớp
                 Transform.translate(
                   offset: const Offset(0, -15),
                   child: Container(
@@ -299,7 +513,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Hãng sản xuất
+
                         Text(
                           product.category.toUpperCase(),
                           style: AppTextStyles.bodySecondary.copyWith(
@@ -310,68 +524,79 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         ),
                         const SizedBox(height: 8),
 
-                        // Tên sản phẩm
                         Text(
                           product.name,
                           style: AppTextStyles.heading1.copyWith(fontSize: 24, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 16),
 
-                        // Giá tiền + Đánh giá sao
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
+                        StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                          stream: FirebaseFirestore.instance.collection('products').doc(product.id).snapshots(),
+                          builder: (context, snapshot) {
+                            final data = snapshot.data?.data();
+                            final liveRating = data != null ? (data['rating'] ?? product.rating) : product.rating;
+                            final liveSold = data != null ? (data['soldCount'] ?? product.soldCount) : product.soldCount;
+                            final liveStock = data != null ? (data['stock'] ?? product.stock) : product.stock;
+
+                            return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  formatVnd(product.price),
-                                  style: AppTextStyles.price.copyWith(fontSize: 26, color: AppColors.primary, fontWeight: FontWeight.bold),
-                                ),
-                                if (product.hasDiscount) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    formatVnd(product.oldPrice!),
-                                    style: AppTextStyles.bodySecondary.copyWith(
-                                      decoration: TextDecoration.lineThrough,
-                                      fontSize: 15,
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          formatVnd(product.price),
+                                          style: AppTextStyles.price.copyWith(fontSize: 26, color: AppColors.primary, fontWeight: FontWeight.bold),
+                                        ),
+                                        if (product.hasDiscount) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            formatVnd(product.oldPrice!),
+                                            style: AppTextStyles.bodySecondary.copyWith(
+                                              decoration: TextDecoration.lineThrough,
+                                              fontSize: 15,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
                                     ),
-                                  ),
-                                ],
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xfffff9db),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.star_rounded, color: Colors.amber, size: 20),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            (liveRating as num).toStringAsFixed(1),
+                                            style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xffe67e22)),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Text('🔥 Đã bán $liveSold', style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+                                    const SizedBox(width: 16),
+                                    Container(width: 1.5, height: 14, color: Colors.grey[300]),
+                                    const SizedBox(width: 16),
+                                    Text('📦 Kho còn: $liveStock', style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+                                  ],
+                                ),
                               ],
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: const Color(0xfffff9db),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.star_rounded, color: Colors.amber, size: 20),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${product.rating}',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xffe67e22)),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                            );
+                          },
                         ),
 
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Text('🔥 Đã bán ${product.soldCount}', style: TextStyle(color: Colors.grey[600], fontSize: 14)),
-                            const SizedBox(width: 16),
-                            Container(width: 1.5, height: 14, color: Colors.grey[300]),
-                            const SizedBox(width: 16),
-                            Text('📦 Kho còn: ${product.stock}', style: TextStyle(color: Colors.grey[600], fontSize: 14)),
-                          ],
-                        ),
-
-                        // --- SPREEMALL ĐẢM BẢO ---
                         const SizedBox(height: 16),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -404,57 +629,57 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           child: Divider(color: Color(0xfff1f3f5), thickness: 1.5),
                         ),
 
-                        // --- CHỌN KÍCH CỠ & HƯỚNG DẪN CHỌN SIZE ---
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Chọn kích cỡ', style: AppTextStyles.heading3.copyWith(fontSize: 16)),
-                            TextButton.icon(
-                              onPressed: _showSizeGuide,
-                              icon: const Icon(Icons.straighten_rounded, size: 16, color: Colors.blue),
-                              label: const Text('Hướng dẫn chọn size', style: TextStyle(color: Colors.blue, fontSize: 14, fontWeight: FontWeight.w600)),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          height: 42,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _sizes.length,
-                            itemBuilder: (context, index) {
-                              final size = _sizes[index];
-                              final isSelected = _selectedSize == size;
-                              return GestureDetector(
-                                onTap: () => setState(() => _selectedSize = size),
-                                child: Container(
-                                  margin: const EdgeInsets.only(right: 12),
-                                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                                  decoration: BoxDecoration(
-                                    color: isSelected ? AppColors.primary : const Color(0xfff1f3f5),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: isSelected ? AppColors.primary : Colors.transparent),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Text(
-                                    size,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: isSelected ? Colors.white : Colors.black87,
+                        if (_hasSizes) ...[
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Chọn kích cỡ', style: AppTextStyles.heading3.copyWith(fontSize: 16)),
+                              TextButton.icon(
+                                onPressed: _showSizeGuide,
+                                icon: const Icon(Icons.straighten_rounded, size: 16, color: Colors.blue),
+                                label: const Text('Hướng dẫn chọn size', style: TextStyle(color: Colors.blue, fontSize: 14, fontWeight: FontWeight.w600)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            height: 42,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _sizes.length,
+                              itemBuilder: (context, index) {
+                                final size = _sizes[index];
+                                final isSelected = _selectedSize == size;
+                                return GestureDetector(
+                                  onTap: () => setState(() => _selectedSize = size),
+                                  child: Container(
+                                    margin: const EdgeInsets.only(right: 12),
+                                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? AppColors.primary : const Color(0xfff1f3f5),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: isSelected ? AppColors.primary : Colors.transparent),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      size,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: isSelected ? Colors.white : Colors.black87,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              );
-                            },
+                                );
+                              },
+                            ),
                           ),
-                        ),
 
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 20),
-                          child: Divider(color: Color(0xfff1f3f5), thickness: 1.5),
-                        ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 20),
+                            child: Divider(color: Color(0xfff1f3f5), thickness: 1.5),
+                          ),
+                        ],
 
-                        // Chọn số lượng
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -489,7 +714,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           child: Divider(color: Color(0xfff1f3f5), thickness: 1.5),
                         ),
 
-                        // Khối Chính sách mua hàng
                         _buildPolicyCard(
                           icon: Icons.local_shipping_rounded,
                           title: 'Miễn phí vận chuyển',
@@ -507,20 +731,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           child: Divider(color: Color(0xfff1f3f5), thickness: 1.5),
                         ),
 
-                        // --- THÔNG SỐ KỸ THUẬT ---
                         Text('Thông số sản phẩm', style: AppTextStyles.heading3.copyWith(fontSize: 17)),
                         const SizedBox(height: 10),
-                        _buildSpecificationRow('Thương hiệu', product.category.toUpperCase()),
-                        _buildSpecificationRow('Chất liệu', _isShoeProduct ? 'Da cao cấp, Cao su tổng hợp' : 'Cotton cao cấp & Polyester'),
-                        _buildSpecificationRow('Xuất xứ', 'Chính hãng'),
-                        _buildSpecificationRow('Kiểu dáng', _isShoeProduct ? 'Thể thao năng động' : 'Thời trang ôm phom thoải mái'),
+                        if (product.brand.isNotEmpty) _buildSpecificationRow('Thương hiệu', product.brand),
+                        _buildSpecificationRow('Danh mục', product.category),
+                        ...product.specs.entries.map((e) => _buildSpecificationRow(e.key, e.value)),
+                        if (product.brand.isEmpty && product.specs.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Text(
+                              'Đang cập nhật thêm thông số cho sản phẩm này.',
+                              style: TextStyle(color: Colors.grey[500], fontSize: 13, fontStyle: FontStyle.italic),
+                            ),
+                          ),
 
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 20),
                           child: Divider(color: Color(0xfff1f3f5), thickness: 1.5),
                         ),
 
-                        // Khối Mô tả sản phẩm
                         Text('Mô tả sản phẩm', style: AppTextStyles.heading3.copyWith(fontSize: 17)),
                         const SizedBox(height: 10),
                         Text(
@@ -533,30 +762,88 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           child: Divider(color: Color(0xfff1f3f5), thickness: 1.5),
                         ),
 
-                        // --- KHỐI ĐÁNH GIÁ SẢN PHẨM ---
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Đánh giá sản phẩm', style: AppTextStyles.heading3.copyWith(fontSize: 17)),
-                            Text('Xem tất cả (${product.soldCount > 5 ? '12' : '0'}) >', style: const TextStyle(color: Colors.grey, fontSize: 13)),
-                          ],
+                        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                          stream: FirebaseFirestore.instance
+                              .collection('reviews')
+                              .where('productId', isEqualTo: product.id)
+                              .snapshots(),
+                          builder: (context, snapshot) {
+                            final docs = (snapshot.data?.docs ?? []).toList()
+                              ..sort((a, b) {
+                                final aTime = a.data()['createdAt'];
+                                final bTime = b.data()['createdAt'];
+                                if (aTime is Timestamp && bTime is Timestamp) return bTime.compareTo(aTime);
+                                return 0;
+                              });
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text('Đánh giá sản phẩm', style: AppTextStyles.heading3.copyWith(fontSize: 17)),
+                                    Text('${docs.length} đánh giá', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+
+                                if (_checkingReviewEligibility)
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 8),
+                                    child: SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                                  )
+                                else if (_canReview)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: OutlinedButton.icon(
+                                      onPressed: _openReviewDialog,
+                                      icon: const Icon(Icons.rate_review_outlined, size: 18),
+                                      label: const Text('Viết đánh giá của bạn'),
+                                      style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary, side: const BorderSide(color: AppColors.primary)),
+                                    ),
+                                  )
+                                else
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: Text(
+                                      '🔒 Mua và nhận hàng sản phẩm này để có thể đánh giá.',
+                                      style: TextStyle(color: Colors.grey[600], fontSize: 12.5, fontStyle: FontStyle.italic),
+                                    ),
+                                  ),
+
+                                if (docs.isEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    child: Text('Chưa có đánh giá nào cho sản phẩm này.', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                                  )
+                                else
+                                  ...docs.map((doc) {
+                                    final data = doc.data();
+                                    final createdAt = data['createdAt'];
+                                    final dateLabel = createdAt is Timestamp
+                                        ? '${createdAt.toDate().day.toString().padLeft(2, '0')}-${createdAt.toDate().month.toString().padLeft(2, '0')}-${createdAt.toDate().year}'
+                                        : 'Vừa xong';
+
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom: 12),
+                                      child: _buildReviewItem(
+                                        username: (data['userName'] ?? 'Người dùng ẩn danh') as String,
+                                        rating: (data['rating'] ?? 5) as int,
+                                        date: dateLabel,
+                                        comment: (data['comment'] ?? '') as String,
+                                      ),
+                                    );
+                                  }),
+                              ],
+                            );
+                          },
                         ),
-                        const SizedBox(height: 12),
-                        _buildReviewItem(
-                          username: 'nguyenvana***',
-                          rating: 5,
-                          date: '10-03-2026',
-                          comment: _isShoeProduct 
-                            ? 'Giày đi êm chân lắm, đế bám tốt dã man. Giao hàng cực nhanh, tư vấn chọn size chuẩn chỉnh luôn!' 
-                            : 'Sản phẩm vải mặc siêu mát, giao hàng nhanh chóng tầm 2 ngày là nhận được rồi. Shop tư vấn size rất vừa vặn nhé!',
-                        ),
-                        const SizedBox(height: 12),
-                        _buildReviewItem(
-                          username: 'tranthib***',
-                          rating: 4,
-                          date: '02-03-2026',
-                          comment: 'Hàng chuẩn Mall đóng gói rất cẩn thận, lên dáng đẹp, tuy nhiên shipper giao hơi trễ tí nhưng tổng quan vẫn rất hài lòng.',
-                        ),
+
+                        if (product.brand.isNotEmpty) ...[
+                          const SizedBox(height: 20),
+                          _ShopVisitCard(product: product),
+                        ],
 
                         const SizedBox(height: 100),
                       ],
@@ -567,7 +854,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
           ),
 
-          // Khối AppBar trong suốt phía trên cùng
           Positioned(
             top: 0,
             left: 0,
@@ -592,23 +878,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     padding: const EdgeInsets.only(right: 16),
                     child: Row(
                       children: [
-                        AnimatedBuilder(
-                          animation: FavoritesController.instance,
-                          builder: (context, _) {
-                            final isFav = FavoritesController.instance.isFavorite(product.id);
-                            return CircleAvatar(
-                              backgroundColor: Colors.white.withOpacity(0.9),
-                              child: IconButton(
-                                onPressed: () => FavoritesController.instance.toggle(product),
-                                icon: Icon(
-                                  isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                                  color: isFav ? Colors.redAccent : Colors.black87,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(width: 12),
                         CircleAvatar(
                           backgroundColor: Colors.white.withOpacity(0.9),
                           child: IconButton(
@@ -630,7 +899,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ],
       ),
 
-      // Thanh Bottom mua hàng nổi dưới đáy
       bottomNavigationBar: Container(
         padding: EdgeInsets.only(
           left: 20,
@@ -682,7 +950,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  // Widget dòng thông số kỹ thuật
   Widget _buildSpecificationRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -701,7 +968,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  // Widget hiển thị từng item review của khách hàng
   Widget _buildReviewItem({required String username, required int rating, required String date, required String comment}) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -737,7 +1003,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  // Widget phụ trợ vẽ khối dòng chính sách
   Widget _buildPolicyCard({required IconData icon, required String title, required String subtitle}) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -762,6 +1027,184 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ImageNavButton extends StatelessWidget {
+  final IconData icon;
+  final bool visible;
+  final VoidCallback onTap;
+
+  const _ImageNavButton({required this.icon, required this.visible, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!visible) return const SizedBox(width: 36);
+
+    return CircleAvatar(
+      radius: 18,
+      backgroundColor: Colors.white.withOpacity(0.85),
+      child: IconButton(
+        padding: EdgeInsets.zero,
+        icon: Icon(icon, color: Colors.black87, size: 22),
+        onPressed: onTap,
+      ),
+    );
+  }
+}
+
+class _ShopVisitCard extends StatelessWidget {
+  final Product product;
+  const _ShopVisitCard({required this.product});
+
+  void _goToShop(BuildContext context, String? logoUrl) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BrandProductsScreen(brandName: product.brand, brandLogoUrl: logoUrl),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance.collection('brands').where('name', isEqualTo: product.brand).limit(1).snapshots(),
+      builder: (context, brandSnapshot) {
+        final logoUrl = brandSnapshot.data?.docs.isNotEmpty == true ? (brandSnapshot.data!.docs.first.data()['url'] as String?) : null;
+
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance.collection('products').snapshots(),
+          builder: (context, productsSnapshot) {
+            final allDocs = productsSnapshot.data?.docs ?? [];
+            final shopProducts = allDocs
+                .map((d) => Product.fromMap(d.id, d.data()))
+                .where((p) => p.brand.trim().toLowerCase() == product.brand.trim().toLowerCase())
+                .toList();
+
+            final otherProducts = shopProducts.where((p) => p.id != product.id).toList();
+            final avgRating = shopProducts.isEmpty ? 0.0 : shopProducts.fold<double>(0, (sum, p) => sum + p.rating) / shopProducts.length;
+            final totalSold = shopProducts.fold<int>(0, (sum, p) => sum + p.soldCount);
+
+            return Container(
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  InkWell(
+                    onTap: () => _goToShop(context, logoUrl),
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 52,
+                            height: 52,
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.border)),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(7),
+                              child: (logoUrl != null && logoUrl.isNotEmpty)
+                                  ? Image.network(
+                                      logoUrl,
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (_, __, ___) => Center(child: Text(product.brand.isNotEmpty ? product.brand[0].toUpperCase() : '?', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary))),
+                                    )
+                                  : Center(child: Text(product.brand.isNotEmpty ? product.brand[0].toUpperCase() : '?', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary))),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(product.brand, style: AppTextStyles.heading3),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
+                                    const SizedBox(width: 2),
+                                    Text(avgRating > 0 ? avgRating.toStringAsFixed(1) : '—', style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600)),
+                                    const SizedBox(width: 10),
+                                    Text('${shopProducts.length} sản phẩm', style: AppTextStyles.caption),
+                                    const SizedBox(width: 10),
+                                    Text('Đã bán $totalSold', style: AppTextStyles.caption),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          OutlinedButton(
+                            onPressed: () => _goToShop(context, logoUrl),
+                            style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary, side: const BorderSide(color: AppColors.primary)),
+                            child: const Text('Xem Shop'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (otherProducts.isNotEmpty) ...[
+                    const Divider(height: 1),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+                      child: Text('Sản phẩm khác của shop', style: AppTextStyles.bodyRegular.copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+                    ),
+                    SizedBox(
+                      height: 168,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
+                        itemCount: otherProducts.length > 8 ? 8 : otherProducts.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 10),
+                        itemBuilder: (context, index) {
+                          final p = otherProducts[index];
+                          return GestureDetector(
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => ProductDetailScreen(product: p)),
+                            ),
+                            child: Container(
+                              width: 118,
+                              decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.border)),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: ClipRRect(
+                                      borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+                                      child: p.hasImage
+                                          ? Image.network(p.image, fit: BoxFit.cover, width: double.infinity, errorBuilder: (_, __, ___) => Icon(p.icon, color: AppColors.primary))
+                                          : Icon(p.icon, color: AppColors.primary),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(6),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                                        Text(formatVnd(p.price), style: AppTextStyles.price.copyWith(fontSize: 12)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:spreemall/models/user_role.dart';
+import '../../controllers/role_controller.dart';
+import '../../controllers/cart_controller.dart';
 import '../../config/theme/app_colors.dart';
 import '../../config/theme/app_text_styles.dart';
 import '../../routes/app_routes.dart';
@@ -45,13 +48,25 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _navigateToNextScreen() async {
-    // Chạy animation
+
     await _controller.forward();
 
-    // Hiển thị logo thêm 2 giây
     await Future.delayed(const Duration(seconds: 2));
 
     if (!mounted) return;
+
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      final role = await RoleController.instance.fetchRole(currentUser.uid);
+      await CartController.instance.loadCart(currentUser.uid);
+      if (!mounted) return;
+      if (role.isAdmin) {
+        Navigator.of(context).pushReplacementNamed(AppRoutes.adminDashboard);
+      } else {
+        Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+      }
+      return;
+    }
 
     Navigator.of(context).pushReplacementNamed(AppRoutes.login);
   }

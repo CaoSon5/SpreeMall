@@ -8,6 +8,7 @@ import 'flash_sale_section.dart';
 import 'home_app_bar.dart';
 import 'home_bottom_nav.dart';
 import 'home_tabs.dart';
+import 'notifications_tab.dart';
 import 'product_grid_section.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -22,7 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   static const List<String> _titles = [
     "Trang chủ",
-    "Yêu thích",
+    "Thông báo",
     "Giỏ hàng",
     "Tài khoản",
   ];
@@ -35,12 +36,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final tabs = <Widget>[
       const _HomeTabContent(),
-      const FavoritesTab(),
+      const NotificationsTab(),
       const CartTab(),
       const ProfileScreen(),
     ];
 
-    // Trang chủ và Tài khoản tự quản lý app bar riêng (search bar / header xịn).
     final PreferredSizeWidget? appBar = _currentIndex == 0
         ? HomeAppBar(onCartTap: () => _goToTab(2))
         : (_currentIndex == 3
@@ -62,7 +62,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-/// Nội dung tab Trang chủ: banner, danh mục, flash sale, sản phẩm nổi bật
 class _HomeTabContent extends StatelessWidget {
   const _HomeTabContent();
 
